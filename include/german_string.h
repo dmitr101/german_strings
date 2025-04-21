@@ -101,6 +101,11 @@ namespace gs
             }
         }
 
+        german_string(const char* c_str, string_class cls = string_class::temporary)
+            : german_string(c_str, std::strlen(c_str), cls)
+        {
+        }
+
         ~german_string()
         {
             if (!_is_small())
@@ -131,6 +136,11 @@ namespace gs
             return _get_size();
         }
 
+        size_type length() const
+        {
+            return _get_size();
+        }
+
         std::string_view as_string_view() const
         {
             return std::string_view(_get_maybe_small_ptr(), _get_size());
@@ -149,5 +159,7 @@ namespace gs
             }
             return std::memcmp(_get_ptr(), other._get_ptr(), get_size()) == 0;
         }
+
+
     };
 }
