@@ -43,10 +43,12 @@ endif()
 
 # Update compiler options for all targets
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(${PROJECT_NAME}_lib PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(${PROJECT_NAME}_lib PRIVATE -Wall -Wextra -Wpedantic) # -fsanitize=address -static-libsan)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE -Wall -Wextra -Wpedantic)
     if(TARGET ${PROJECT_NAME}_tests)
         target_compile_options(${PROJECT_NAME}_tests PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
+        target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
     endif()
 elseif(MSVC)
     target_compile_options(${PROJECT_NAME}_lib PRIVATE /W4)

@@ -1,5 +1,6 @@
 #include <random>
 #include <string>
+#include <limits>
 #include <vector>
 
 #include "german_string.h"
