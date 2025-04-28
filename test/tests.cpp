@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-constexpr auto SMALL_KNOWN_STRING = "Hello, World!";
+constexpr auto SMALL_KNOWN_STRING = "Hello World";
 constexpr auto LARGE_KNOWN_STRING = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
 
 template <typename StringType>
@@ -21,7 +21,7 @@ std::vector<StringType> generate_random_strings(size_t count, size_t min_length,
     std::uniform_int_distribution<> length_distribution(min_length, max_length);
     std::uniform_int_distribution<> char_distribution(0, alphabet.size() - 1);
 
-    constexpr float small_known_string_probability = 0.1f; // 10% chance to generate the small known string
+    constexpr float small_known_string_probability = 0.1f;  // 10% chance to generate the small known string
     constexpr float large_known_string_probability = 0.05f; // 5% chance to generate the large known string
     std::uniform_real_distribution<> known_string_distribution(0.0f, 1.0f);
 
@@ -50,53 +50,104 @@ std::vector<StringType> generate_random_strings(size_t count, size_t min_length,
     return strings;
 }
 
-struct CountingAllocator : std::allocator<char> {
+struct CountingAllocator : std::allocator<char>
+{
     CountingAllocator() = default;
 
-    char* allocate(size_t n) {
+    char *allocate(size_t n)
+    {
         ++get_count_allocs();
         return std::allocator<char>::allocate(n);
     }
 
-    void deallocate(char* p, size_t n) {
+    void deallocate(char *p, size_t n)
+    {
         ++get_count_deallocs();
         std::allocator<char>::deallocate(p, n);
     }
 
-    static void reset() {
+    static void reset()
+    {
         get_count_allocs() = 0;
         get_count_deallocs() = 0;
     }
 
-    static size_t& get_count_allocs() {
+    static size_t &get_count_allocs()
+    {
         thread_local size_t count_allocs = 0;
         return count_allocs;
     }
 
-    static size_t& get_count_deallocs() {
+    static size_t &get_count_deallocs()
+    {
         thread_local size_t count_deallocs = 0;
         return count_deallocs;
     }
 };
 
 // Demonstrate some basic assertions.
-TEST(GermanStrings, BasicCorrectness) {
-  size_t count = 1000;
-  size_t min_length = 8;
-  size_t max_length = 240;
-  uint32_t seed = 42;
-  auto std_strings = generate_random_strings<std::string>(count, min_length, max_length, seed);
-  auto german_strings = generate_random_strings<gs::german_string>(count, min_length, max_length, seed);
+TEST(GermanStrings, BasicCorrectness)
+{
+    size_t count = 1000;
+    size_t min_length = 8;
+    size_t max_length = 240;
+    uint32_t seed = 42;
 
-  for (size_t i = 0; i < count; ++i)
-  {
-      EXPECT_EQ(std_strings[i].length(), german_strings[i].length());
-      EXPECT_EQ(std_strings[i].compare(german_strings[i].as_string_view()), 0);
-      EXPECT_EQ(std_strings[i], german_strings[i].as_string_view());
-  }
+    for (size_t outer = 0; outer < 5; ++outer)
+    {
+        seed = (seed * 18942753) ^ (seed << 5) ^ (seed >> 7); // Random
+        auto std_strings = generate_random_strings<std::string>(count, min_length, max_length, seed);
+        auto german_strings = generate_random_strings<gs::german_string>(count, min_length, max_length, seed);
+        for (size_t i = 0; i < count; ++i)
+        {
+            EXPECT_EQ(std_strings[i].length(), german_strings[i].length());
+            EXPECT_EQ(std_strings[i].compare(german_strings[i].as_string_view()), 0);
+            EXPECT_EQ(std_strings[i], german_strings[i].as_string_view());
+        }
+    }
 }
 
-TEST(GermanStrings, SSO) {
+TEST(GermanStrings, SmallComparison)
+{
+    gs::german_string small_str1("abc");
+    gs::german_string small_str2("bcd");
+    gs::german_string small_str3("xyz");
+    gs::german_string small_str4("abt");
+
+    EXPECT_FALSE(small_str1 == small_str2);
+    EXPECT_FALSE(small_str1 == small_str3);
+    EXPECT_FALSE(small_str1 == small_str4);
+
+    auto sv1 = small_str1.as_string_view();
+    auto sv2 = small_str2.as_string_view();
+    EXPECT_TRUE(sv1 < sv2);
+    EXPECT_TRUE(small_str1 < small_str2);
+}
+
+TEST(GermanStrings, Sorting)
+{
+    size_t count = 10;
+    size_t min_length = 8;
+    size_t max_length = 240;
+    uint32_t seed = 42;
+    for (size_t outer = 0; outer < 1; ++outer)
+    {
+        seed = (seed * 18942753) ^ (seed << 5) ^ (seed >> 7); // Random
+        auto std_strings = generate_random_strings<std::string>(count, min_length, max_length, seed);
+        std::sort(std_strings.begin(), std_strings.end());
+        auto german_strings = generate_random_strings<gs::german_string>(count, min_length, max_length, seed);
+        std::sort(german_strings.begin(), german_strings.end());
+        for (size_t i = 0; i < count; ++i)
+        {
+            EXPECT_EQ(std_strings[i].length(), german_strings[i].length());
+            EXPECT_EQ(std_strings[i].compare(german_strings[i].as_string_view()), 0);
+            EXPECT_EQ(std_strings[i], german_strings[i].as_string_view());
+        }
+    }
+}
+
+TEST(GermanStrings, SSO)
+{
     CountingAllocator::reset();
 
     gs::basic_german_string<CountingAllocator> str1("Hello", gs::temporary_t{}); // 5 chars, should be SSO, no allocs even when passing the class
@@ -112,7 +163,8 @@ TEST(GermanStrings, SSO) {
     EXPECT_EQ(CountingAllocator::get_count_allocs(), 1);
 }
 
-TEST(GermanStrings, Classes) {
+TEST(GermanStrings, Classes)
+{
     CountingAllocator::reset();
 
     {
