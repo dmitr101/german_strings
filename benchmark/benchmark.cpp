@@ -116,6 +116,33 @@ BENCHMARK(GermanStringCountExisting)
     ->Args({1000, 8, 1024, 42})
     ->Args({100000, 8, 1024, 42});
 
+
+
+template<typename TString>
+void TemplateStringSort(benchmark::State &state)
+{
+    size_t count = state.range(0);
+    size_t min_length = state.range(1);
+    size_t max_length = state.range(2);
+    uint32_t seed = state.range(3);
+    auto strings = generate_random_strings<TString>(count, min_length, max_length, seed);
+
+    for (auto _ : state)
+    {
+        std::sort(strings.begin(), strings.end());
+        benchmark::DoNotOptimize(strings);
+        std::sort(strings.rbegin(), strings.rend());
+        benchmark::DoNotOptimize(strings);
+    }
+}
+
+BENCHMARK_TEMPLATE(TemplateStringSort, std::string)
+    ->Args({1000, 8, 1024, 42})
+    ->Args({100000, 8, 1024, 42});
+
+BENCHMARK_TEMPLATE(TemplateStringSort, gs::german_string)
+    ->Args({1000, 8, 1024, 42})
+    ->Args({100000, 8, 1024, 42});
 // Benchmarks todo:
 // Sorting and array of strings
 // Serialization and deserialization, zero copy vs string_view
