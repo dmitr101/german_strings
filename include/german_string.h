@@ -4,37 +4,75 @@
 #include <cstdint>
 #include <cstring>
 #include <cassert>
-#include <compare> 
+#include <compare>
+#include <concepts>
 
 namespace gs
 {
-    struct temporary_tag
+    enum class string_class : uint8_t
     {
+        temporary = 0,
+        persistent = 1,
+        transient = 2,
     };
-    struct persistent_tag
+
+    struct temporary_t
     {
+        constexpr inline operator string_class() const
+        {
+            return string_class::temporary;
+        }
     };
-    struct transient_tag
+
+    struct persistent_t
     {
+        constexpr inline operator string_class() const
+        {
+            return string_class::persistent;
+        }
     };
+
+    struct transient_t
+    {
+        constexpr inline operator string_class()
+        {
+            return string_class::transient;
+        }
+    };
+
+    namespace detail
+    {
+        // template<typename T>
+        // constexpr bool probably_str_literal = 
+        //      std::is_convertible_v      <T, const char*> &&
+        //     !std::is_rvalue_reference_v <T> &&
+        //     !std::is_pointer_v          <T> &&
+        //     !std::is_array_v            <T> &&
+        //     !std::is_class_v            <T>;
+
+        // template<typename T>
+        // consteval string_class predict_string_class()
+        // {
+        //     if constexpr (probably_str_literal<T>)
+        //     {
+        //         return string_class::persistent;
+        //     }
+        //     else 
+        //     {
+        //         return string_class::temporary;
+        //     }
+        // }
+    }
 
     template<typename TAllocator = std::allocator<char>>
     class basic_german_string
     {
     public:
         using size_type = std::uint32_t;
-        enum class string_class : uint8_t
-        {
-            temporary = 0,
-            persistent = 1,
-            transient = 2,
-        };
-
         static constexpr size_type SMALL_STRING_SIZE = 12;
         static constexpr std::uint64_t PTR_TAG_MASK = static_cast<std::uint64_t>(0b11) << 62;
 
     private:
-
         struct _gs_impl : TAllocator
         {
             _gs_impl(TAllocator alloc) 
@@ -135,6 +173,11 @@ namespace gs
                     return static_cast<string_class>(tag);
                 }
             }
+            
+            // VERY UNSAFE! Only used when moving out of a temporary-class string.
+            void _make_transient() {
+                _state[1] = _state[1] | _get_ptr_tag(string_class::transient);
+            }
 
             bool _equals(const _gs_impl &other) const
             {
@@ -168,17 +211,42 @@ namespace gs
         {
         }
 
-        basic_german_string(const char* c_str, string_class cls = string_class::temporary)
-            : basic_german_string(c_str, std::strlen(c_str), cls)
+        basic_german_string(const char* ptr, 
+            string_class cls = string_class::temporary, 
+            const TAllocator& allocator = TAllocator()
+        )
+            : basic_german_string(ptr, std::strlen(ptr), cls, allocator)
         {
         }
 
         basic_german_string(std::nullptr_t) = delete;
 
-        basic_german_string(const basic_german_string&) = default;
-        basic_german_string(basic_german_string&&) = default;
+        // basic_german_string(const basic_german_string& other)
+        // {
+        //     // TODO: impl
+        // }
+
+        basic_german_string(basic_german_string&& other)
+            : _impl(std::move(other._impl))
+        {
+            if (other.get_class() == string_class::temporary)
+            {
+                other._impl._make_transient();
+            }
+        }
+
         basic_german_string& operator=(const basic_german_string&) = default;
-        basic_german_string& operator=(basic_german_string&&) = default;
+        basic_german_string& operator=(basic_german_string&& other)
+        {
+            if (this != &other)
+            {
+                _impl.~_gs_impl();
+                _impl = std::move(other._impl);
+                other._impl._state[0] = 0;
+                other._impl._state[1] = 0;
+            }
+            return *this;
+        }
 
         string_class get_class() const
         {
@@ -200,14 +268,30 @@ namespace gs
             return std::string_view(_impl._get_maybe_small_ptr(), _impl._get_size());
         }
 
+        basic_german_string copy_to_temporary() const
+        {
+            if (_impl._is_small())
+            {
+                return *this;
+            }
+            return basic_german_string(_impl._get_ptr(), _impl._get_size(), string_class::temporary, get_allocator());
+        }
+
         bool operator==(const basic_german_string &other) const
         {
             return _impl._equals(other._impl);
         }
 
+        // implement comparisons, they should also benefit from the prefix
+
         bool empty() const
         {
             return _impl._get_size() == 0;
+        }
+
+        TAllocator get_allocator() const
+        {
+            return static_cast<TAllocator>(_impl);
         }
     };
 

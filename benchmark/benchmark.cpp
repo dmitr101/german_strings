@@ -89,8 +89,8 @@ void GermanStringCountExisting(benchmark::State &state)
     uint32_t seed = state.range(3);
     auto strings = generate_random_strings<gs::german_string>(count, min_length, max_length, seed);
 
-    const gs::german_string small_known_string(SMALL_KNOWN_STRING, std::strlen(SMALL_KNOWN_STRING), gs::german_string::string_class::persistent);
-    const gs::german_string large_known_string(LARGE_KNOWN_STRING, std::strlen(LARGE_KNOWN_STRING), gs::german_string::string_class::persistent);
+    const gs::german_string small_known_string(SMALL_KNOWN_STRING, std::strlen(SMALL_KNOWN_STRING), gs::persistent_t{});
+    const gs::german_string large_known_string(LARGE_KNOWN_STRING, std::strlen(LARGE_KNOWN_STRING), gs::persistent_t{});
 
     for (auto _ : state)
     {
@@ -115,5 +115,10 @@ void GermanStringCountExisting(benchmark::State &state)
 BENCHMARK(GermanStringCountExisting)
     ->Args({1000, 8, 1024, 42})
     ->Args({100000, 8, 1024, 42});
+
+// Benchmarks todo:
+// Sorting and array of strings
+// Serialization and deserialization, zero copy vs string_view
+
 
 BENCHMARK_MAIN();
