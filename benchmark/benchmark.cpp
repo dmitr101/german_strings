@@ -20,7 +20,7 @@ std::vector<StringType> generate_random_strings(size_t count, size_t min_length,
     std::uniform_int_distribution<> length_distribution(min_length, max_length);
     std::uniform_int_distribution<> char_distribution(0, alphabet.size() - 1);
 
-    constexpr float small_known_string_probability = 0.1f; // 10% chance to generate the small known string
+    constexpr float small_known_string_probability = 0.1f;  // 10% chance to generate the small known string
     constexpr float large_known_string_probability = 0.05f; // 5% chance to generate the large known string
     std::uniform_real_distribution<> known_string_distribution(0.0f, 1.0f);
 
@@ -116,9 +116,7 @@ BENCHMARK(GermanStringCountExisting)
     ->Args({1000, 8, 1024, 42})
     ->Args({100000, 8, 1024, 42});
 
-
-
-template<typename TString>
+template <typename TString>
 void TemplateStringSort(benchmark::State &state)
 {
     size_t count = state.range(0);
@@ -146,6 +144,5 @@ BENCHMARK_TEMPLATE(TemplateStringSort, gs::german_string)
 // Benchmarks todo:
 // Sorting and array of strings
 // Serialization and deserialization, zero copy vs string_view
-
 
 BENCHMARK_MAIN();
