@@ -7,6 +7,8 @@
 #include <compare>
 #include <concepts>
 
+// TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
+
 namespace gs
 {
     enum class string_class : uint8_t
@@ -153,6 +155,12 @@ namespace gs
                 return reinterpret_cast<const char *>(&_state) + sizeof(size_type);
             }
 
+            uint32_t _get_prefix() const
+            {
+                // TODO: probably very UB
+                return *reinterpret_cast<const uint32_t *>(_get_small_ptr());
+            }
+
             char *_get_maybe_small_ptr()
             {
                 return _is_small()
@@ -206,7 +214,8 @@ namespace gs
                 return std::memcmp(_get_non_small_ptr(), other._get_non_small_ptr(), _get_size()) == 0;
             }
 
-            // comparison for a string and it's prefix???
+            // probably wrong for a case with a string and its prefix
+            // also probably not optimal
             int _compare(const _gs_impl &other) const
             {
                 const auto min_size = std::min(_get_size(), other._get_size());
@@ -217,6 +226,16 @@ namespace gs
                     return prefix_cmp;
                 }
                 return std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
+            }
+
+            // a bad implementation of starts_with, at least probably correct 
+            bool _starts_with(const _gs_impl &other) const
+            {
+                if (_get_size() < other._get_size())
+                {
+                    return false;
+                }
+                return _compare(other) == 0;
             }
 
             // The first 4 bytes are the size of the string
@@ -307,11 +326,6 @@ namespace gs
             return _impl._compare(other._impl);
         }
 
-        bool operator==(const basic_german_string &other) const
-        {
-            return _impl._equals(other._impl);
-        }
-
         bool operator!=(const basic_german_string &other) const
         {
             return !(*this == other);
@@ -347,6 +361,18 @@ namespace gs
             return std::string_view(_impl._get_small_ptr(), 4);
         }
 
+        template <typename TOtherAllocator>
+        bool operator==(const basic_german_string<TOtherAllocator> &other) const
+        {
+            return _impl._equals(other._impl);
+        }
+
+        template <typename TOtherAllocator>
+        bool starts_with(const basic_german_string<TOtherAllocator> &other) const
+        {
+            return _impl._starts_with(other._impl);
+        }
+
         // implement starts_with, ends_with, first one should benefit
 
         TAllocator get_allocator() const
@@ -356,4 +382,12 @@ namespace gs
     };
 
     using german_string = basic_german_string<>;
+
+    namespace literals
+    {
+        inline german_string operator"" _gs(const char *str, size_t size)
+        {
+            return german_string(str, size, string_class::persistent);
+        }
+    } // namespace literals
 }

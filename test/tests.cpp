@@ -146,6 +146,27 @@ TEST(GermanStrings, Sorting)
     }
 }
 
+// TODO: Test some empty strings
+TEST(GermanStrings, Empty)
+{
+    gs::german_string empty_str;
+    EXPECT_TRUE(empty_str.empty());
+    EXPECT_EQ(empty_str.length(), 0);
+    EXPECT_EQ(empty_str.get_size(), 0);
+    EXPECT_EQ(empty_str.get_class(), gs::string_class::persistent);
+}
+
+TEST(GermanStrings, StartsWith) 
+{
+    using namespace gs::literals;
+    auto str1 = "Hello, World!"_gs;
+    auto str2 = "Hello"_gs;
+    auto str3 = "World"_gs;
+
+    EXPECT_TRUE(str1.starts_with(str2));
+    EXPECT_FALSE(str1.starts_with(str3));
+}
+
 TEST(GermanStrings, SSO)
 {
     CountingAllocator::reset();
