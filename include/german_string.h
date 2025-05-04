@@ -237,7 +237,7 @@ namespace gs
                 }
                 return _compare(other) == 0;
             }
-
+            
             // The first 4 bytes are the size of the string
             // The next 4 bytes are the prefix
             // The next 8 bytes are a tagged pointer, first 2 bits are the tag for class
@@ -371,6 +371,12 @@ namespace gs
         bool starts_with(const basic_german_string<TOtherAllocator> &other) const
         {
             return _impl._starts_with(other._impl);
+        }
+
+        template <typename TOtherAllocator>
+        bool ends_with(const basic_german_string<TOtherAllocator> &other) const
+        {
+
         }
 
         // implement starts_with, ends_with, first one should benefit
