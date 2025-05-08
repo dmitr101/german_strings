@@ -64,6 +64,41 @@ namespace gs
         //         return string_class::temporary;
         //     }
         // }
+
+        struct _gs_impl_no_alloc
+        {
+            using size_type = std::uint32_t;
+            static constexpr size_type SMALL_STRING_SIZE = 12;
+            static constexpr std::uint64_t PTR_TAG_MASK = static_cast<std::uint64_t>(0b11) << 62;
+
+            _gs_impl_no_alloc();
+
+            static constexpr std::uint64_t _get_ptr_tag(string_class cls)
+            {
+                return static_cast<std::uint64_t>(cls) << 62;
+            }
+
+            size_type _get_size() const;
+            bool _is_small() const;
+            const char *_get_non_small_ptr() const;
+            char *_get_non_small_ptr();
+            char *_get_small_ptr();
+            const char *_get_small_ptr() const;
+            uint32_t _get_prefix() const;
+            char *_get_maybe_small_ptr();
+            const char *_get_maybe_small_ptr() const;
+            string_class _get_class() const;
+            void _make_transient();
+            bool _equals(const _gs_impl_no_alloc &other) const;
+            int _compare(const _gs_impl_no_alloc &other) const;
+            bool _starts_with(const _gs_impl_no_alloc &other) const;
+
+            // The first 4 bytes are the size of the string
+            // The next 4 bytes are the prefix
+            // The next 8 bytes are a tagged pointer, first 2 bits are the tag for class
+            // TODO: Experiment with using a union to be more clear about the layout
+            std::uint64_t _state[2];
+        };
     }
 
     template <typename TAllocator = std::allocator<char>>
@@ -75,10 +110,12 @@ namespace gs
         static constexpr std::uint64_t PTR_TAG_MASK = static_cast<std::uint64_t>(0b11) << 62;
 
     private:
-        struct _gs_impl : TAllocator
+        // Impl also hides the allocator
+        struct _gs_impl : public detail::_gs_impl_no_alloc, public TAllocator
         {
+            using base = detail::_gs_impl_no_alloc;
             _gs_impl(TAllocator alloc)
-                : TAllocator(alloc), _state{0, 0}
+                : TAllocator(alloc)
             {
             }
 
@@ -119,129 +156,6 @@ namespace gs
                     }
                 }
             }
-
-            size_type _get_size() const
-            {
-                // relies on little endian
-                return static_cast<size_type>(_state[0]);
-            }
-
-            bool _is_small() const
-            {
-                return _get_size() <= SMALL_STRING_SIZE;
-            }
-
-            const char *_get_non_small_ptr() const
-            {
-                // relies on the ptr being in user-space canonical form
-                // and the first 2 bits of the pointer being 0
-                return reinterpret_cast<const char *>(_state[1] & ~PTR_TAG_MASK);
-            }
-
-            char *_get_non_small_ptr()
-            {
-                // relies on the ptr being in user-space canonical form
-                // and the first 2 bits of the pointer being 0
-                return reinterpret_cast<char *>(_state[1] & ~PTR_TAG_MASK);
-            }
-
-            char *_get_small_ptr()
-            {
-                return reinterpret_cast<char *>(&_state) + sizeof(size_type);
-            }
-
-            const char *_get_small_ptr() const
-            {
-                return reinterpret_cast<const char *>(&_state) + sizeof(size_type);
-            }
-
-            uint32_t _get_prefix() const
-            {
-                // TODO: probably very UB
-                return *reinterpret_cast<const uint32_t *>(_get_small_ptr());
-            }
-
-            char *_get_maybe_small_ptr()
-            {
-                return _is_small()
-                           ? _get_small_ptr()
-                           : _get_non_small_ptr();
-            }
-
-            const char *_get_maybe_small_ptr() const
-            {
-                return _is_small()
-                           ? _get_small_ptr()
-                           : _get_non_small_ptr();
-            }
-
-            static constexpr std::uint64_t _get_ptr_tag(string_class cls)
-            {
-                return static_cast<std::uint64_t>(cls) << 62;
-            }
-
-            string_class _get_class() const
-            {
-                if (_is_small())
-                {
-                    return string_class::persistent;
-                }
-                else
-                {
-                    std::uint64_t tag = (_state[1] & PTR_TAG_MASK) >> 62;
-                    return static_cast<string_class>(tag);
-                }
-            }
-
-            // VERY UNSAFE! Only used when moving out of a temporary-class string.
-            void _make_transient()
-            {
-                _state[1] = _state[1] | _get_ptr_tag(string_class::transient);
-            }
-
-            bool _equals(const _gs_impl &other) const
-            {
-                if (_state[0] != other._state[0])
-                {
-                    return false;
-                }
-
-                // If we are small, it's guaranteed that that the other one is as well as we checked on the size and the prefix in the previous conditional
-                if (_is_small())
-                {
-                    return _state[1] == other._state[1];
-                }
-                return std::memcmp(_get_non_small_ptr(), other._get_non_small_ptr(), _get_size()) == 0;
-            }
-
-            // probably wrong for a case with a string and its prefix
-            // also probably not optimal
-            int _compare(const _gs_impl &other) const
-            {
-                const auto min_size = std::min(_get_size(), other._get_size());
-                const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(std::uint32_t));
-                int prefix_cmp = std::memcmp(_get_small_ptr(), other._get_small_ptr(), min_or_prefix_size);
-                if (prefix_cmp != 0 || min_or_prefix_size == min_size)
-                {
-                    return prefix_cmp;
-                }
-                return std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
-            }
-
-            // a bad implementation of starts_with, at least probably correct 
-            bool _starts_with(const _gs_impl &other) const
-            {
-                if (_get_size() < other._get_size())
-                {
-                    return false;
-                }
-                return _compare(other) == 0;
-            }
-            
-            // The first 4 bytes are the size of the string
-            // The next 4 bytes are the prefix
-            // The next 8 bytes are a tagged pointer, first 2 bits are the tag for class
-            std::uint64_t _state[2];
         };
         _gs_impl _impl;
 
@@ -376,7 +290,6 @@ namespace gs
         template <typename TOtherAllocator>
         bool ends_with(const basic_german_string<TOtherAllocator> &other) const
         {
-
         }
 
         // implement starts_with, ends_with, first one should benefit
