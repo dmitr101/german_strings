@@ -156,6 +156,33 @@ namespace gs
                     }
                 }
             }
+
+            _gs_impl _substr(size_type start, size_type length, string_class cls = string_class::transient) const
+            {
+                if (start + length > _get_size())
+                {
+                    throw std::out_of_range("Substring out of range");
+                }
+                return _gs_impl(_get_maybe_small_ptr() + start, length, cls, *this);
+            }
+
+            bool _starts_with(const _gs_impl_no_alloc &other) const
+            {
+                if (_get_prefix() != other._get_prefix() || _get_size() < other._get_size())
+                {
+                    return false;
+                }
+                return _substr(0, other._get_size())._compare(other) == 0;
+            }
+
+            bool _ends_with(const _gs_impl_no_alloc &other) const
+            {
+                if (_get_size() < other._get_size())
+                {
+                    return false;
+                }
+                return _substr(_get_size() - other._get_size(), other._get_size())._compare(other) == 0;
+            }
         };
         _gs_impl _impl;
 
@@ -179,10 +206,11 @@ namespace gs
 
         basic_german_string(std::nullptr_t) = delete;
 
-        // basic_german_string(const basic_german_string& other)
-        // {
-        //     // TODO: impl
-        // }
+        // TODO: Should I worry about allocator rebinding here?
+        basic_german_string(const std::string &str, const TAllocator &allocator = TAllocator())
+            : basic_german_string(str.data(), str.size(), string_class::temporary, allocator)
+        {
+        }
 
         basic_german_string(basic_german_string &&other)
             : _impl(std::move(other._impl))
@@ -211,7 +239,7 @@ namespace gs
             return _impl._get_class();
         }
 
-        size_type get_size() const
+        size_type size() const
         {
             return _impl._get_size();
         }
@@ -290,9 +318,14 @@ namespace gs
         template <typename TOtherAllocator>
         bool ends_with(const basic_german_string<TOtherAllocator> &other) const
         {
+            return _impl._ends_with(other._impl);
         }
 
-        // implement starts_with, ends_with, first one should benefit
+        // By default we return a transient string, basically a string_view
+        basic_german_string substr(size_type start, size_type length, string_class cls = string_class::transient) const
+        {
+            return _impl._substr(start, length, cls);
+        }
 
         TAllocator get_allocator() const
         {

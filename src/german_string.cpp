@@ -104,20 +104,11 @@ namespace gs::detail
         const auto min_size = std::min(_get_size(), other._get_size());
         const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(std::uint32_t));
         int prefix_cmp = std::memcmp(_get_small_ptr(), other._get_small_ptr(), min_or_prefix_size);
-        if (prefix_cmp != 0 || min_or_prefix_size == min_size)
+        if (min_or_prefix_size == min_size || prefix_cmp != 0)
         {
-            return prefix_cmp;
+            return prefix_cmp != 0 ? prefix_cmp : (_get_size() - other._get_size());
         }
-        return std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
-    }
-
-    // a bad implementation of starts_with, at least probably correct
-    bool _gs_impl_no_alloc::_starts_with(const _gs_impl_no_alloc &other) const
-    {
-        if (_get_size() < other._get_size())
-        {
-            return false;
-        }
-        return _compare(other) == 0;
+        int result = std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
+        return result != 0 ? result : (_get_size() - other._get_size());
     }
 }

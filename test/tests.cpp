@@ -124,6 +124,103 @@ TEST(GermanStrings, SmallComparison)
     EXPECT_TRUE(small_str1 < small_str2);
 }
 
+TEST(GermanStrings, CompareMethod)
+{
+    // 1. Basic comparison test cases
+    gs::german_string str1("abc");
+    gs::german_string str2("abc");
+    gs::german_string str3("abcd");
+    gs::german_string str4("abd");
+    gs::german_string str5("abb");
+    gs::german_string empty;
+    
+    // Equal strings should return 0
+    EXPECT_EQ(str1.compare(str2), 0);
+    EXPECT_EQ(str2.compare(str1), 0);
+    
+    // String vs itself should return 0
+    EXPECT_EQ(str1.compare(str1), 0);
+    
+    // Longer string with same prefix should be greater
+    EXPECT_LT(str1.compare(str3), 0);  // "abc" < "abcd"
+    EXPECT_GT(str3.compare(str1), 0);  // "abcd" > "abc"
+    
+    // Lexicographically greater string should be greater
+    EXPECT_LT(str1.compare(str4), 0);  // "abc" < "abd"
+    EXPECT_GT(str4.compare(str1), 0);  // "abd" > "abc"
+    
+    // Lexicographically smaller string should be smaller
+    EXPECT_GT(str1.compare(str5), 0);  // "abc" > "abb"
+    EXPECT_LT(str5.compare(str1), 0);  // "abb" < "abc"
+    
+    // 2. Empty string comparisons
+    EXPECT_LT(empty.compare(str1), 0);  // "" < "abc"
+    EXPECT_GT(str1.compare(empty), 0);  // "abc" > ""
+    EXPECT_EQ(empty.compare(empty), 0); // "" == ""
+    
+    // 3. SSO edge cases (small string optimization)
+    gs::german_string smallStr("Hello");
+    gs::german_string mediumStr("Hello, World");      // 12 chars, should be SSO
+    gs::german_string largeStr("Hello, World!");      // 13 chars, should not be SSO
+    
+    EXPECT_LT(smallStr.compare(mediumStr), 0);  // "Hello" < "Hello, World"
+    EXPECT_LT(mediumStr.compare(largeStr), 0);  // "Hello, World" < "Hello, World!"
+    EXPECT_LT(smallStr.compare(largeStr), 0);   // "Hello" < "Hello, World!"
+    
+    // 4. Compare with strings of different storage classes
+    gs::german_string tempStr(LARGE_KNOWN_STRING, gs::temporary_t{});
+    gs::german_string transStr(LARGE_KNOWN_STRING, gs::transient_t{});
+    gs::german_string persistStr(LARGE_KNOWN_STRING, gs::persistent_t{});
+    
+    // All should compare equal regardless of string class
+    EXPECT_EQ(tempStr.compare(transStr), 0);
+    EXPECT_EQ(tempStr.compare(persistStr), 0);
+    EXPECT_EQ(transStr.compare(persistStr), 0);
+    
+    // 5. Comparing strings with common prefixes
+    gs::german_string prefix("Hello");
+    gs::german_string withPrefix1("Hello, World");
+    gs::german_string withPrefix2("Hello, Alice");
+    
+    EXPECT_LT(prefix.compare(withPrefix1), 0);     // "Hello" < "Hello, World"
+    EXPECT_LT(prefix.compare(withPrefix2), 0);     // "Hello" < "Hello, Alice"
+    EXPECT_GT(withPrefix1.compare(withPrefix2), 0); // "Hello, World" > "Hello, Alice"
+    
+    // 6. Non-ASCII character comparisons
+    gs::german_string utf8_1("áéíóú");
+    gs::german_string utf8_2("áéíóú");
+    gs::german_string utf8_3("áéíóúü");
+    
+    EXPECT_EQ(utf8_1.compare(utf8_2), 0);  // Equal UTF-8 strings
+    EXPECT_LT(utf8_1.compare(utf8_3), 0);  // Shorter UTF-8 string
+    
+    // 7. Random string comparisons
+    size_t count = 100;
+    size_t min_length = 1;
+    size_t max_length = 30;
+    uint32_t seed = 42;
+
+    auto std_strings = generate_random_strings<std::string>(count, min_length, max_length, seed);
+    auto german_strings = generate_random_strings<gs::german_string>(count, min_length, max_length, seed);
+
+    // Verify that german_string.compare matches std::string.compare for the same strings
+    for (size_t i = 0; i < count; ++i) {
+        for (size_t j = 0; j < count; ++j) {
+            int std_result = std_strings[i].compare(std_strings[j]);
+            int german_result = german_strings[i].compare(german_strings[j]);
+
+            // We only care about the sign of the comparison, not the exact value
+            if (std_result < 0) {
+                EXPECT_LT(german_result, 0);
+            } else if (std_result > 0) {
+                EXPECT_GT(german_result, 0);
+            } else {
+                EXPECT_EQ(german_result, 0);
+            }
+        }
+    }
+}
+
 TEST(GermanStrings, Sorting)
 {
     size_t count = 10;
@@ -152,7 +249,7 @@ TEST(GermanStrings, Empty)
     gs::german_string empty_str;
     EXPECT_TRUE(empty_str.empty());
     EXPECT_EQ(empty_str.length(), 0);
-    EXPECT_EQ(empty_str.get_size(), 0);
+    EXPECT_EQ(empty_str.size(), 0);
     EXPECT_EQ(empty_str.get_class(), gs::string_class::persistent);
 }
 
