@@ -5,6 +5,10 @@ cmake_minimum_required(VERSION 3.14)
 # https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html
 # https://learn.microsoft.com/en-us/vcpkg/users/buildsystems/cmake-integration#vcpkg_overlay_triplets
 
+# https://github.com/Neumann-A/my-vcpkg-triplets/ seems to be a good source for custom triplets
+# https://github.com/qietv/vcpkg-ohos-overlay/blob/main/triplets/arm64-ohos-static.cmake
+
+
 if(DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
   set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       CACHE STRING "Vcpkg toolchain file")
