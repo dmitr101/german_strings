@@ -9,6 +9,7 @@
 #include <compare>
 #include <concepts>
 #include <stdexcept>
+#include <limits>
 
 // TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
 // TODO: A constructor withj size type being size_t and check if the size fits in 32 bits and panic if it doesn't
@@ -111,7 +112,7 @@ namespace gs
                 throw std::length_error("Size exceeds maximum size for basic_german_string");
             }
             return static_cast<_gs_impl_no_alloc::size_type>(size);
-		}
+        }
     }
 
     template <typename TAllocator = std::allocator<char>>
