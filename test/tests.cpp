@@ -1,3 +1,4 @@
+#include <iostream>
 #include <random>
 #include <string>
 #include <limits>
@@ -336,4 +337,9 @@ TEST(GermanStrings, Classes)
     EXPECT_EQ(CountingAllocator::get_count_deallocs(), 2);
 
     // Also test copy constructor and class preservation there
+}
+
+int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

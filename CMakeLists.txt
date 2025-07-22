@@ -36,27 +36,24 @@ target_link_libraries(${PROJECT_NAME}_benchmarks PRIVATE ${PROJECT_NAME}_lib ben
 
 # Define the test target (placeholder, no test files found)
 file(GLOB_RECURSE TEST_SOURCES "test/*.cpp")
-if(TEST_SOURCES)
-    add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
-    target_link_libraries(${PROJECT_NAME}_tests PRIVATE ${PROJECT_NAME}_lib)
-    target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main)
-endif()
+add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES})
+target_link_libraries(${PROJECT_NAME}_tests PRIVATE ${PROJECT_NAME}_lib)
+target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest GTest::gtest_main GTest::gmock GTest::gmock_main)
+
+# Add test to CTest
+add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
 # Update compiler options for all targets
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}_lib PRIVATE -Wall -Wextra -Wpedantic) # -fsanitize=address -static-libsan)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE -Wall -Wextra -Wpedantic)
-    if(TARGET ${PROJECT_NAME}_tests)
-        target_compile_options(${PROJECT_NAME}_tests PRIVATE -Wall -Wextra -Wpedantic)
-        target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
-        target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
-    endif()
+    target_compile_options(${PROJECT_NAME}_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
+    target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
 elseif(MSVC)
     target_compile_options(${PROJECT_NAME}_lib PRIVATE /W4)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE /W4)
-    if(TARGET ${PROJECT_NAME}_tests)
-        target_compile_options(${PROJECT_NAME}_tests PRIVATE /W4)
-    endif()
+    target_compile_options(${PROJECT_NAME}_tests PRIVATE /W4)
 endif()
 
 # # Use libc++ if available
