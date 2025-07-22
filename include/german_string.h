@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <string_view>
 #include <string>
@@ -6,8 +8,10 @@
 #include <cassert>
 #include <compare>
 #include <concepts>
+#include <stdexcept>
 
 // TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
+// TODO: A constructor withj size type being size_t and check if the size fits in 32 bits and panic if it doesn't
 
 namespace gs
 {
@@ -99,6 +103,15 @@ namespace gs
             // TODO: Experiment with using a union to be more clear about the layout
             std::uint64_t _state[2];
         };
+
+        inline _gs_impl_no_alloc::size_type _checked_size_cast(size_t size)
+        {
+            if (size > std::numeric_limits<_gs_impl_no_alloc::size_type>::max())
+            {
+                throw std::length_error("Size exceeds maximum size for basic_german_string");
+            }
+            return static_cast<_gs_impl_no_alloc::size_type>(size);
+		}
     }
 
     template <typename TAllocator = std::allocator<char>>
@@ -200,7 +213,7 @@ namespace gs
         basic_german_string(const char *ptr,
                             string_class cls = string_class::temporary,
                             const TAllocator &allocator = TAllocator())
-            : basic_german_string(ptr, std::strlen(ptr), cls, allocator)
+            : basic_german_string(ptr, detail::_checked_size_cast(std::strlen(ptr)), cls, allocator)
         {
         }
 
@@ -339,7 +352,7 @@ namespace gs
     {
         inline german_string operator"" _gs(const char *str, size_t size)
         {
-            return german_string(str, size, string_class::persistent);
+            return german_string(str, static_cast<german_string::size_type>(size), string_class::persistent);
         }
     } // namespace literals
 }

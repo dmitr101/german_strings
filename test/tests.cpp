@@ -12,14 +12,14 @@ constexpr auto SMALL_KNOWN_STRING = "Hello World";
 constexpr auto LARGE_KNOWN_STRING = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
 
 template <typename StringType>
-std::vector<StringType> generate_random_strings(size_t count, size_t min_length, size_t max_length, uint32_t seed)
+std::vector<StringType> generate_random_strings(size_t count, uint32_t min_length, uint32_t max_length, uint32_t seed)
 {
     std::vector<StringType> strings;
     strings.reserve(count);
     std::string alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+[]{}|;:,.<>?";
     std::mt19937 generator(seed);
     std::uniform_int_distribution<> length_distribution(min_length, max_length);
-    std::uniform_int_distribution<> char_distribution(0, alphabet.size() - 1);
+    std::uniform_int_distribution<> char_distribution(0, static_cast<int>(alphabet.size() - 1));
 
     constexpr float small_known_string_probability = 0.1f;  // 10% chance to generate the small known string
     constexpr float large_known_string_probability = 0.05f; // 5% chance to generate the large known string
@@ -89,8 +89,8 @@ struct CountingAllocator : std::allocator<char>
 TEST(GermanStrings, BasicCorrectness)
 {
     size_t count = 1000;
-    size_t min_length = 8;
-    size_t max_length = 240;
+    uint32_t min_length = 8;
+    uint32_t max_length = 240;
     uint32_t seed = 42;
 
     for (size_t outer = 0; outer < 5; ++outer)
@@ -196,8 +196,8 @@ TEST(GermanStrings, CompareMethod)
     
     // 7. Random string comparisons
     size_t count = 100;
-    size_t min_length = 1;
-    size_t max_length = 30;
+    uint32_t min_length = 1;
+    uint32_t max_length = 30;
     uint32_t seed = 42;
 
     auto std_strings = generate_random_strings<std::string>(count, min_length, max_length, seed);
@@ -224,8 +224,8 @@ TEST(GermanStrings, CompareMethod)
 TEST(GermanStrings, Sorting)
 {
     size_t count = 10;
-    size_t min_length = 8;
-    size_t max_length = 240;
+    uint32_t min_length = 8;
+    uint32_t max_length = 240;
     uint32_t seed = 42;
     for (size_t outer = 0; outer < 1; ++outer)
     {
