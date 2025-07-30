@@ -14,6 +14,15 @@
 // TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
 // TODO: A constructor withj size type being size_t and check if the size fits in 32 bits and panic if it doesn't
 
+// define per-compiler macros for force inline
+#ifdef _MSC_VER
+#define _GS_FORCEINLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define _GS_FORCEINLINE inline __attribute__((always_inline))
+#else
+#define _GS_FORCEINLINE inline
+#endif
+
 namespace gs
 {
     enum class string_class : uint8_t
@@ -83,19 +92,106 @@ namespace gs
                 return static_cast<std::uint64_t>(cls) << 62;
             }
 
-            size_type _get_size() const;
-            bool _is_small() const;
-            const char *_get_non_small_ptr() const;
-            char *_get_non_small_ptr();
-            char *_get_small_ptr();
-            const char *_get_small_ptr() const;
-            uint32_t _get_prefix() const;
-            char *_get_maybe_small_ptr();
-            const char *_get_maybe_small_ptr() const;
-            string_class _get_class() const;
-            void _make_transient();
-            bool _equals(const _gs_impl_no_alloc &other) const;
-            int _compare(const _gs_impl_no_alloc &other) const;
+            _GS_FORCEINLINE size_type _get_size() const
+            {
+                // relies on little endian
+                return static_cast<size_type>(_state[0]);
+            }
+
+            _GS_FORCEINLINE bool _is_small() const
+            {
+                return _get_size() <= SMALL_STRING_SIZE;
+            }
+
+            _GS_FORCEINLINE const char* _get_non_small_ptr() const
+            {
+                // relies on the ptr being in user-space canonical form
+                // and the first 2 bits of the pointer being 0
+                return reinterpret_cast<const char*>(_state[1] & ~PTR_TAG_MASK);
+            }
+
+            _GS_FORCEINLINE char* _get_non_small_ptr()
+            {
+                // relies on the ptr being in user-space canonical form
+                // and the first 2 bits of the pointer being 0
+                return reinterpret_cast<char*>(_state[1] & ~PTR_TAG_MASK);
+            }
+
+            _GS_FORCEINLINE char* _get_small_ptr()
+            {
+                return reinterpret_cast<char*>(&_state) + sizeof(size_type);
+            }
+
+            _GS_FORCEINLINE const char* _get_small_ptr() const
+            {
+                return reinterpret_cast<const char*>(&_state) + sizeof(size_type);
+            }
+
+            _GS_FORCEINLINE uint32_t _get_prefix() const
+            {
+                // TODO: probably very UB
+                return *reinterpret_cast<const uint32_t*>(_get_small_ptr());
+            }
+
+            _GS_FORCEINLINE char* _get_maybe_small_ptr()
+            {
+                return _is_small()
+                    ? _get_small_ptr()
+                    : _get_non_small_ptr();
+            }
+
+            _GS_FORCEINLINE const char* _get_maybe_small_ptr() const
+            {
+                return _is_small()
+                    ? _get_small_ptr()
+                    : _get_non_small_ptr();
+            }
+
+            _GS_FORCEINLINE string_class _get_class() const
+            {
+                if (_is_small())
+                {
+                    return string_class::persistent;
+                }
+                else
+                {
+                    std::uint64_t tag = (_state[1] & PTR_TAG_MASK) >> 62;
+                    return static_cast<string_class>(tag);
+                }
+            }
+            // VERY UNSAFE! Only used when moving out of a temporary-class string.
+            _GS_FORCEINLINE void _make_transient()
+            {
+                _state[1] = _state[1] | _get_ptr_tag(string_class::transient);
+            }
+            _GS_FORCEINLINE bool _equals(const _gs_impl_no_alloc& other) const
+            {
+                if (_state[0] != other._state[0])
+                {
+                    return false;
+                }
+
+                // If we are small, it's guaranteed that that the other one is as well as we checked on the size and the prefix in the previous conditional
+                if (_is_small())
+                {
+                    return _state[1] == other._state[1];
+                }
+                return std::memcmp(_get_non_small_ptr(), other._get_non_small_ptr(), _get_size()) == 0;
+            }
+            // probably wrong for a case with a string and its prefix
+            // also probably not optimal
+            _GS_FORCEINLINE int _compare(const _gs_impl_no_alloc& other) const
+            {
+                const auto min_size = std::min(_get_size(), other._get_size());
+                const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(std::uint32_t));
+                int prefix_cmp = std::memcmp(_get_small_ptr(), other._get_small_ptr(), min_or_prefix_size);
+                if (min_or_prefix_size == min_size || prefix_cmp != 0)
+                {
+                    return prefix_cmp != 0 ? prefix_cmp : (_get_size() - other._get_size());
+                }
+                int result = std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
+                return result != 0 ? result : (_get_size() - other._get_size());
+            }
             bool _starts_with(const _gs_impl_no_alloc &other) const;
 
             // The first 4 bytes are the size of the string
@@ -226,7 +322,7 @@ namespace gs
         {
         }
 
-        basic_german_string(basic_german_string &&other)
+        basic_german_string(basic_german_string &&other) noexcept
             : _impl(std::move(other._impl))
         {
             if (other.get_class() == string_class::temporary)
@@ -236,7 +332,7 @@ namespace gs
         }
 
         basic_german_string &operator=(const basic_german_string &) = default;
-        basic_german_string &operator=(basic_german_string &&other)
+        basic_german_string &operator=(basic_german_string &&other) noexcept
         {
             if (this != &other)
             {
