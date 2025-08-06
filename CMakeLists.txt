@@ -55,9 +55,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
     target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
 elseif(MSVC)
-    target_compile_options(${PROJECT_NAME}_lib PRIVATE /W4)
-    target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE /W4)
-    target_compile_options(${PROJECT_NAME}_tests PRIVATE /W4)
+    target_compile_options(${PROJECT_NAME}_lib PRIVATE /W3)
+    target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE /W3)
+    target_compile_options(${PROJECT_NAME}_tests PRIVATE /W3)
 endif()
 
 # # Use libc++ if available

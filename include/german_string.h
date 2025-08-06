@@ -16,7 +16,7 @@
 
 // define per-compiler macros for force inline
 #ifdef _MSC_VER
-#define _GS_FORCEINLINE __forceinline
+#define GS_FORCEINLINE __forceinline
 #elif defined(__GNUC__) || defined(__clang__)
 #define _GS_FORCEINLINE inline __attribute__((always_inline))
 #else
@@ -92,62 +92,62 @@ namespace gs
                 return static_cast<std::uint64_t>(cls) << 62;
             }
 
-            _GS_FORCEINLINE size_type _get_size() const
+            GS_FORCEINLINE size_type _get_size() const
             {
                 // relies on little endian
                 return static_cast<size_type>(_state[0]);
             }
 
-            _GS_FORCEINLINE bool _is_small() const
+            GS_FORCEINLINE bool _is_small() const
             {
                 return _get_size() <= SMALL_STRING_SIZE;
             }
 
-            _GS_FORCEINLINE const char* _get_non_small_ptr() const
+            GS_FORCEINLINE const char* _get_non_small_ptr() const
             {
                 // relies on the ptr being in user-space canonical form
                 // and the first 2 bits of the pointer being 0
                 return reinterpret_cast<const char*>(_state[1] & ~PTR_TAG_MASK);
             }
 
-            _GS_FORCEINLINE char* _get_non_small_ptr()
+            GS_FORCEINLINE char* _get_non_small_ptr()
             {
                 // relies on the ptr being in user-space canonical form
                 // and the first 2 bits of the pointer being 0
                 return reinterpret_cast<char*>(_state[1] & ~PTR_TAG_MASK);
             }
 
-            _GS_FORCEINLINE char* _get_small_ptr()
+            GS_FORCEINLINE char* _get_small_ptr()
             {
                 return reinterpret_cast<char*>(&_state) + sizeof(size_type);
             }
 
-            _GS_FORCEINLINE const char* _get_small_ptr() const
+            GS_FORCEINLINE const char* _get_small_ptr() const
             {
                 return reinterpret_cast<const char*>(&_state) + sizeof(size_type);
             }
 
-            _GS_FORCEINLINE uint32_t _get_prefix() const
+            GS_FORCEINLINE uint32_t _get_prefix() const
             {
                 // TODO: probably very UB
                 return *reinterpret_cast<const uint32_t*>(_get_small_ptr());
             }
 
-            _GS_FORCEINLINE char* _get_maybe_small_ptr()
+            GS_FORCEINLINE char* _get_maybe_small_ptr()
             {
                 return _is_small()
                     ? _get_small_ptr()
                     : _get_non_small_ptr();
             }
 
-            _GS_FORCEINLINE const char* _get_maybe_small_ptr() const
+            GS_FORCEINLINE const char* _get_maybe_small_ptr() const
             {
                 return _is_small()
                     ? _get_small_ptr()
                     : _get_non_small_ptr();
             }
 
-            _GS_FORCEINLINE string_class _get_class() const
+            GS_FORCEINLINE string_class _get_class() const
             {
                 if (_is_small())
                 {
@@ -160,11 +160,11 @@ namespace gs
                 }
             }
             // VERY UNSAFE! Only used when moving out of a temporary-class string.
-            _GS_FORCEINLINE void _make_transient()
+            GS_FORCEINLINE void _make_transient()
             {
                 _state[1] = _state[1] | _get_ptr_tag(string_class::transient);
             }
-            _GS_FORCEINLINE bool _equals(const _gs_impl_no_alloc& other) const
+            GS_FORCEINLINE bool _equals(const _gs_impl_no_alloc& other) const
             {
                 if (_state[0] != other._state[0])
                 {
@@ -180,7 +180,7 @@ namespace gs
             }
             // probably wrong for a case with a string and its prefix
             // also probably not optimal
-            _GS_FORCEINLINE int _compare(const _gs_impl_no_alloc& other) const
+            GS_FORCEINLINE int _compare(const _gs_impl_no_alloc& other) const
             {
                 const auto min_size = std::min(_get_size(), other._get_size());
                 const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(std::uint32_t));
@@ -447,7 +447,7 @@ namespace gs
 
     namespace literals
     {
-        inline german_string operator"" _gs(const char *str, size_t size)
+        inline german_string operator""_gs(const char *str, size_t size)
         {
             return german_string(str, static_cast<german_string::size_type>(size), string_class::persistent);
         }

@@ -244,7 +244,6 @@ TEST(GermanStrings, Sorting)
     }
 }
 
-// TODO: Test some empty strings
 TEST(GermanStrings, Empty)
 {
     gs::german_string empty_str;
@@ -337,6 +336,12 @@ TEST(GermanStrings, Classes)
     EXPECT_EQ(CountingAllocator::get_count_deallocs(), 2);
 
     // Also test copy constructor and class preservation there
+    {
+        gs::basic_german_string<CountingAllocator> larger_temp_string(LARGE_KNOWN_STRING, gs::temporary_t{});
+        EXPECT_EQ(larger_temp_string.get_class(), gs::string_class::temporary);
+        EXPECT_TRUE(larger_temp_string.as_string_view() == LARGE_KNOWN_STRING);
+        EXPECT_EQ(CountingAllocator::get_count_allocs(), 3);
+	}
 }
 
 int main(int argc, char **argv) {
