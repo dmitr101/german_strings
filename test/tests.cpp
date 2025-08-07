@@ -86,6 +86,125 @@ struct CountingAllocator : std::allocator<char>
     }
 };
 
+static int prefix_memcmp(std::uint32_t ti1, std::uint32_t ti2, int n)
+{
+    if (n > 4) return 0;
+
+    static constexpr std::uint32_t masks[5] = {
+        0x00000000,
+        0x000000FF,
+        0x0000FFFF,
+        0x00FFFFFF,
+        0xFFFFFFFF
+    };
+    std::uint32_t m = masks[n];
+    ti1 &= m;
+    ti2 &= m;
+
+    char ts1[4];
+    std::memcpy(ts1, &ti1, 4);
+    char ts2[4];
+    std::memcpy(ts2, &ti2, 4);
+
+    alignas(16) int ra[4] = {
+        (unsigned char)ts1[0] - (unsigned char)ts2[0],
+        (unsigned char)ts1[1] - (unsigned char)ts2[1],
+        (unsigned char)ts1[2] - (unsigned char)ts2[2],
+        (unsigned char)ts1[3] - (unsigned char)ts2[3],
+    };
+    __m128i zero = _mm_setzero_si128();
+    __m128i arr = _mm_load_si128((const __m128i*)ra);
+    __m128i cmpr = _mm_cmpeq_epi32(arr, zero);
+    std::uint32_t mask = _mm_movemask_epi8(cmpr);
+	uint32_t count_ones = std::countr_one(mask);
+    uint32_t idx = (count_ones >> 2) & 0x3;
+    int result = ra[idx];
+    return result;
+}
+
+
+static int prefix_memcmp_gpt(std::uint32_t ti1, std::uint32_t ti2, int n)
+{
+    if (n <= 0 || n > 4) return 0;
+
+    static constexpr std::uint32_t masks[5] = {
+        0x00000000,
+        0x000000FF,
+        0x0000FFFF,
+        0x00FFFFFF,
+        0xFFFFFFFF
+    };
+    std::uint32_t m = masks[n];
+    ti1 &= m;
+    ti2 &= m;
+
+    alignas(16) unsigned char ts1[4];
+    alignas(16) unsigned char ts2[4];
+    std::memcpy(ts1, &ti1, 4);
+    std::memcpy(ts2, &ti2, 4);
+
+    __m128i a = _mm_cvtsi32_si128(*(int*)ts1);
+    __m128i b = _mm_cvtsi32_si128(*(int*)ts2);
+    __m128i cmp = _mm_cmpeq_epi8(a, b);
+    std::uint32_t mask_eq = _mm_movemask_epi8(cmp); // lower n bits set if equal
+    int first_diff = std::countr_one(mask_eq & ((1 << n) - 1));
+
+    if (first_diff < n)
+        return (int)ts1[first_diff] - (int)ts2[first_diff];
+
+    return 0;
+}
+
+TEST(GermanStrings, prefix_memcmp_test)
+{
+    {
+        std::uint32_t ti1 = 0;
+        std::uint32_t ti2 = 0;
+        std::memcpy(&ti1, "abcd", 4);
+        std::memcpy(&ti2, "abce", 4);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 0), 0);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 1), 0);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 2), 0);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 3), 0);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 4), -1);
+    }
+
+    {
+        std::uint32_t ti1 = 0;
+        std::uint32_t ti2 = 0;
+        std::memcpy(&ti1, "bbcd", 4);
+        std::memcpy(&ti2, "abce", 4);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 0), 0);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 1), 1);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 2), 1);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 3), 1);
+        EXPECT_EQ(prefix_memcmp(ti1, ti2, 4), 1);
+    }
+
+    {
+        std::uint32_t ti1 = 0;
+        std::uint32_t ti2 = 0;
+        std::memcpy(&ti1, "abcd", 4);
+        std::memcpy(&ti2, "abce", 4);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 0), 0);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 1), 0);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 2), 0);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 3), 0);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 4), -1);
+    }
+    {
+        std::uint32_t ti1 = 0;
+        std::uint32_t ti2 = 0;
+        std::memcpy(&ti1, "bbcd", 4);
+        std::memcpy(&ti2, "abce", 4);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 0), 0);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 1), 1);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 2), 1);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 3), 1);
+        EXPECT_EQ(prefix_memcmp_gpt(ti1, ti2, 4), 1);
+	}
+}
+
 // Demonstrate some basic assertions.
 TEST(GermanStrings, BasicCorrectness)
 {
@@ -179,7 +298,7 @@ TEST(GermanStrings, CompareMethod)
     EXPECT_EQ(transStr.compare(persistStr), 0);
     
     // 5. Comparing strings with common prefixes
-    gs::german_string prefix("Hello");
+    gs::german_string prefix("Hell");
     gs::german_string withPrefix1("Hello, World");
     gs::german_string withPrefix2("Hello, Alice");
     
