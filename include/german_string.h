@@ -59,95 +59,17 @@ namespace gs
 
     namespace detail
     {
-        // template<typename T>
-        // constexpr bool probably_str_literal =
-        //      std::is_convertible_v      <T, const char*> &&
-        //     !std::is_rvalue_reference_v <T> &&
-        //     !std::is_pointer_v          <T> &&
-        //     !std::is_array_v            <T> &&
-        //     !std::is_class_v            <T>;
 
-        // template<typename T>
-        // consteval string_class predict_string_class()
-        // {
-        //     if constexpr (probably_str_literal<T>)
-        //     {
-        //         return string_class::persistent;
-        //     }
-        //     else
-        //     {
-        //         return string_class::temporary;
-        //     }
-        // }
-
-        GS_FORCEINLINE int prefix_memcmp(std::uint32_t ti1, std::uint32_t ti2, int n)
+        GS_FORCEINLINE int prefix_memcmp(std::uint32_t a, std::uint32_t b, int n)
         {
-            if (n > 4) return 0;
+            std::uint32_t diff = a ^ b;
+            std::uint32_t mask = (std::uint32_t)((0xFFFFFFFFull << (n * 8)) >> 32);
+            diff &= mask;
 
-            static constexpr std::uint32_t masks[5] = {
-                0x00000000,
-                0x000000FF,
-                0x0000FFFF,
-                0x00FFFFFF,
-                0xFFFFFFFF
-            };
-            std::uint32_t m = masks[n];
-            ti1 &= m;
-            ti2 &= m;
-
-            char ts1[4];
-            std::memcpy(ts1, &ti1, 4);
-            char ts2[4];
-            std::memcpy(ts2, &ti2, 4);
-
-            alignas(16) int ra[4] = {
-                (unsigned char)ts1[0] - (unsigned char)ts2[0],
-                (unsigned char)ts1[1] - (unsigned char)ts2[1],
-                (unsigned char)ts1[2] - (unsigned char)ts2[2],
-                (unsigned char)ts1[3] - (unsigned char)ts2[3],
-            };
-            __m128i zero = _mm_setzero_si128();
-            __m128i arr = _mm_load_si128((const __m128i*)ra);
-            __m128i cmpr = _mm_cmpeq_epi32(arr, zero);
-            std::uint32_t mask = _mm_movemask_epi8(cmpr);
-            uint32_t count_ones = std::countr_one(mask);
-            uint32_t idx = (count_ones >> 2) & 0x3;
-            int result = ra[idx];
-            return result;
-        }
-
-
-        GS_FORCEINLINE int prefix_memcmp_gpt(std::uint32_t ti1, std::uint32_t ti2, int n)
-        {
-            if (n <= 0 || n > 4) return 0;
-
-            static constexpr std::uint32_t masks[5] = {
-                0x00000000,
-                0x000000FF,
-                0x0000FFFF,
-                0x00FFFFFF,
-                0xFFFFFFFF
-            };
-            std::uint32_t m = masks[n];
-            ti1 &= m;
-            ti2 &= m;
-
-            alignas(16) unsigned char ts1[4];
-            alignas(16) unsigned char ts2[4];
-            std::memcpy(ts1, &ti1, 4);
-            std::memcpy(ts2, &ti2, 4);
-
-            __m128i a = _mm_cvtsi32_si128(*(int*)ts1);
-            __m128i b = _mm_cvtsi32_si128(*(int*)ts2);
-            __m128i cmp = _mm_cmpeq_epi8(a, b);
-            
-            std::uint32_t mask_eq = _mm_movemask_epi8(cmp); // lower n bits set if equal
-            int first_diff = _tzcnt_u32(mask_eq & ((1 << n) - 1));
-
-            if (first_diff < n)
-                return (int)ts1[first_diff] - (int)ts2[first_diff];
-
-            return 0;
+            int first_diff = std::countr_zero(diff) / 8;
+            std::uint8_t byte_a = ((std::uint64_t)a >> (first_diff * 8)) & 0xFF;
+            std::uint8_t byte_b = ((std::uint64_t)b >> (first_diff * 8)) & 0xFF;
+            return (int)byte_a - (int)byte_b;
         }
 
         struct _gs_impl_no_alloc
@@ -200,8 +122,7 @@ namespace gs
 
             GS_FORCEINLINE uint32_t _get_prefix() const
             {
-                // TODO: probably very UB
-                return *reinterpret_cast<const uint32_t*>(_get_small_ptr());
+				return static_cast<uint32_t>(_state[0] >> 32);
             }
 
             GS_FORCEINLINE char* _get_maybe_small_ptr()
@@ -230,11 +151,7 @@ namespace gs
                     return static_cast<string_class>(tag);
                 }
             }
-            // VERY UNSAFE! Only used when moving out of a temporary-class string.
-            GS_FORCEINLINE void _make_transient()
-            {
-                _state[1] = _state[1] | _get_ptr_tag(string_class::transient);
-            }
+
             GS_FORCEINLINE bool _equals(const _gs_impl_no_alloc& other) const
             {
                 if (_state[0] != other._state[0])
@@ -249,21 +166,19 @@ namespace gs
                 }
                 return std::memcmp(_get_non_small_ptr(), other._get_non_small_ptr(), _get_size()) == 0;
             }
-            // probably wrong for a case with a string and its prefix
-            // also probably not optimal
+
             GS_FORCEINLINE int _compare(const _gs_impl_no_alloc& other) const
             {
                 const auto min_size = std::min(_get_size(), other._get_size());
-                const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(std::uint32_t));
-                int prefix_cmp = std::memcmp(_get_small_ptr(), other._get_small_ptr(), min_or_prefix_size);
+                const auto min_or_prefix_size = std::min(min_size, (uint32_t)sizeof(size_type));
+                int prefix_cmp = prefix_memcmp(_get_prefix(), other._get_prefix(), min_or_prefix_size);
                 if (min_or_prefix_size == min_size || prefix_cmp != 0)
                 {
                     return prefix_cmp != 0 ? prefix_cmp : (_get_size() - other._get_size());
                 }
-                int result = std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, min_size - min_or_prefix_size);
+                int result = std::memcmp(_get_maybe_small_ptr() + 4, other._get_maybe_small_ptr() + 4, static_cast<size_t>(min_size) - min_or_prefix_size);
                 return result != 0 ? result : (_get_size() - other._get_size());
             }
-            bool _starts_with(const _gs_impl_no_alloc &other) const;
 
             // The first 4 bytes are the size of the string
             // The next 4 bytes are the prefix
@@ -398,7 +313,7 @@ namespace gs
         {
             if (other.get_class() == string_class::temporary)
             {
-                other._impl._make_transient();
+                other._impl._state[1] = other._impl._state[1] | other._impl._get_ptr_tag(string_class::transient);
             }
         }
 
@@ -449,30 +364,21 @@ namespace gs
             return _impl._compare(other._impl);
         }
 
+        template <typename TOtherAllocator>
+        bool operator==(const basic_german_string<TOtherAllocator>& other) const
+        {
+            return _impl._equals(other._impl);
+        }
+
         bool operator!=(const basic_german_string &other) const
         {
             return !(*this == other);
         }
 
-        bool operator<(const basic_german_string &other) const
+        std::strong_ordering operator<=>(const basic_german_string &other) const
         {
-            return _impl._compare(other._impl) < 0;
-        }
-
-        bool operator>(const basic_german_string &other) const
-        {
-            return _impl._compare(other._impl) > 0;
-        }
-
-        bool operator<=(const basic_german_string &other) const
-        {
-            return _impl._compare(other._impl) <= 0;
-        }
-
-        bool operator>=(const basic_german_string &other) const
-        {
-            return _impl._compare(other._impl) >= 0;
-        }
+            return _impl._compare(other._impl) <=> 0;
+		}
 
         bool empty() const
         {
@@ -482,12 +388,6 @@ namespace gs
         std::string_view get_prefix_sv() const
         {
             return std::string_view(_impl._get_small_ptr(), 4);
-        }
-
-        template <typename TOtherAllocator>
-        bool operator==(const basic_german_string<TOtherAllocator> &other) const
-        {
-            return _impl._equals(other._impl);
         }
 
         template <typename TOtherAllocator>
