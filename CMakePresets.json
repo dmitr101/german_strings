@@ -1,0 +1,233 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "clang-20",
+            "displayName": "Clang 20 Build",
+            "description": "Build with Clang 20 compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "clang-20-debug",
+            "displayName": "Clang 20 Debug",
+            "description": "Debug build with Clang 20 compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "clang-20-release",
+            "displayName": "Clang 20 Release",
+            "description": "Release build with Clang 20 compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20-release",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "gcc-11",
+            "displayName": "GCC 11 Build",
+            "description": "Build with GCC 11 compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/gcc-11",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            },
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "gcc-11-debug",
+            "displayName": "GCC 11 Debug",
+            "description": "Debug build with GCC 11 compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/gcc-11-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "gcc",
+                "CMAKE_CXX_COMPILER": "g++",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            },
+            "environment": {
+                "CC": "gcc",
+                "CXX": "g++"
+            }
+        },
+        {
+            "name": "clang-20-libcxx",
+            "displayName": "Clang 20 with libc++",
+            "description": "Build with Clang 20 compiler using libc++ standard library",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20-libcxx",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-linux-libcxx",
+                "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+                "CMAKE_CXX_FLAGS": "-stdlib=libc++",
+                "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++abi"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "clang-20-libcxx-debug",
+            "displayName": "Clang 20 Debug with libc++",
+            "description": "Debug build with Clang 20 compiler using libc++ standard library",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20-libcxx-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-linux-libcxx",
+                "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+                "CMAKE_CXX_FLAGS": "-stdlib=libc++",
+                "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++abi"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "clang-20-libcxx-release",
+            "displayName": "Clang 20 Release with libc++",
+            "description": "Release build with Clang 20 compiler using libc++ standard library",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/clang-20-libcxx-release",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-20",
+                "CMAKE_CXX_COMPILER": "clang++-20",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-linux-libcxx",
+                "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/triplets",
+                "CMAKE_CXX_FLAGS": "-stdlib=libc++",
+                "CMAKE_EXE_LINKER_FLAGS": "-stdlib=libc++ -lc++abi"
+            },
+            "environment": {
+                "CC": "clang-20",
+                "CXX": "clang++-20"
+            }
+        },
+        {
+            "name": "default",
+            "displayName": "Default Build",
+            "description": "Default build with system compiler",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "clang-20",
+            "configurePreset": "clang-20",
+            "displayName": "Build with Clang 20"
+        },
+        {
+            "name": "clang-20-debug",
+            "configurePreset": "clang-20-debug",
+            "displayName": "Debug Build with Clang 20"
+        },
+        {
+            "name": "clang-20-release",
+            "configurePreset": "clang-20-release",
+            "displayName": "Release Build with Clang 20"
+        },
+        {
+            "name": "gcc-11",
+            "configurePreset": "gcc-11",
+            "displayName": "Build with GCC 11"
+        },
+        {
+            "name": "gcc-11-debug",
+            "configurePreset": "gcc-11-debug",
+            "displayName": "Debug Build with GCC 11"
+        },
+        {
+            "name": "clang-20-libcxx",
+            "configurePreset": "clang-20-libcxx",
+            "displayName": "Build with Clang 20 + libc++"
+        },
+        {
+            "name": "clang-20-libcxx-debug",
+            "configurePreset": "clang-20-libcxx-debug",
+            "displayName": "Debug Build with Clang 20 + libc++"
+        },
+        {
+            "name": "clang-20-libcxx-release",
+            "configurePreset": "clang-20-libcxx-release",
+            "displayName": "Release Build with Clang 20 + libc++"
+        },
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "displayName": "Default Build"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "clang-20",
+            "configurePreset": "clang-20",
+            "displayName": "Test with Clang 20"
+        },
+        {
+            "name": "gcc-11",
+            "configurePreset": "gcc-11",
+            "displayName": "Test with GCC 11"
+        },
+        {
+            "name": "clang-20-libcxx",
+            "configurePreset": "clang-20-libcxx",
+            "displayName": "Test with Clang 20 + libc++"
+        },
+        {
+            "name": "default",
+            "configurePreset": "default",
+            "displayName": "Default Test"
+        }
+    ]
+}
