@@ -4,6 +4,7 @@
 #include <limits>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 #include "german_string.h"
 
