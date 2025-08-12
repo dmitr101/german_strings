@@ -130,107 +130,47 @@ std::vector<StringType> generate_random_strings(size_t count, uint32_t min_lengt
     return strings;
 }
 
-// 1. Construction Benchmarks
 template <typename StringType>
-void StringConstruction(benchmark::State &state)
+void StringStartsWithComparison(benchmark::State &state)
 {
     size_t count = state.range(0);
-    uint32_t string_length = static_cast<uint32_t>(state.range(1));
-    uint32_t seed = static_cast<uint32_t>(state.range(2));
+    uint32_t min_length = static_cast<uint32_t>(state.range(1));
+    uint32_t max_length = static_cast<uint32_t>(state.range(2));
+    uint32_t seed = static_cast<uint32_t>(state.range(3));
 
-    auto random_strings = generate_random_strings<std::string>(count, string_length, string_length, seed);
+    auto strings = generate_random_strings<StringType>(count, min_length, max_length, seed);
 
     for (auto _ : state)
     {
-        std::vector<StringType> strings;
-        strings.reserve(count);
-        for (const auto &str : random_strings)
+        size_t starts_with_count = 0;
+        for (const auto &str : strings)
         {
-            if constexpr (std::is_same_v<StringType, std::string>)
+            if (str.starts_with(StringType{"https://"}))
             {
-                strings.emplace_back(str);
-            }
-            else
-            {
-                strings.emplace_back(str.c_str(), static_cast<uint32_t>(str.length()), gs::temporary_t{});
+                ++starts_with_count;
             }
         }
-        benchmark::DoNotOptimize(strings);
+        benchmark::DoNotOptimize(starts_with_count);
         benchmark::ClobberMemory();
     }
 
     state.SetItemsProcessed(state.iterations() * count);
-    state.SetBytesProcessed(state.iterations() * count * string_length);
 }
 
-BENCHMARK_TEMPLATE(StringConstruction, std::string)
-    ->Args({1000, 16, 42})
-    ->Args({1000, 64, 42})
-    ->Args({1000, 256, 42})
-    ->Args({10000, 16, 42})
-    ->Args({10000, 64, 42});
+BENCHMARK_TEMPLATE(StringStartsWithComparison, std::string)
+    ->Args({1000, 8, 1024, 42})
+    ->Args({10000, 8, 1024, 42})
+    ->Args({100000, 8, 1024, 42})
+    ->Args({500000, 8, 1024, 42})
+    ->Args({1000000, 8, 1024, 42});
 
-BENCHMARK_TEMPLATE(StringConstruction, gs::german_string)
-    ->Args({1000, 16, 42})
-    ->Args({1000, 64, 42})
-    ->Args({1000, 256, 42})
-    ->Args({10000, 16, 42})
-    ->Args({10000, 64, 42});
+BENCHMARK_TEMPLATE(StringStartsWithComparison, gs::german_string)
+    ->Args({1000, 8, 1024, 42})
+    ->Args({10000, 8, 1024, 42})
+    ->Args({100000, 8, 1024, 42})
+    ->Args({500000, 8, 1024, 42})
+    ->Args({1000000, 8, 1024, 42});
 
-// 2. Move Construction Benchmarks (since copy construction is not available)
-template <typename StringType>
-void StringMoveConstruction(benchmark::State &state)
-{
-    size_t count = state.range(0);
-    uint32_t string_length = static_cast<uint32_t>(state.range(1));
-    uint32_t seed = static_cast<uint32_t>(state.range(2));
-
-    for (auto _ : state)
-    {
-        std::vector<StringType> source_strings;
-        source_strings.reserve(count);
-
-        // First create source strings
-        auto random_strings = generate_random_strings<std::string>(count, string_length, string_length, seed);
-        for (const auto &str : random_strings)
-        {
-            if constexpr (std::is_same_v<StringType, std::string>)
-            {
-                source_strings.emplace_back(str);
-            }
-            else
-            {
-                source_strings.emplace_back(str.c_str(), static_cast<uint32_t>(str.length()), gs::temporary_t{});
-            }
-        }
-
-        // Then move them
-        std::vector<StringType> moved_strings;
-        moved_strings.reserve(count);
-        for (auto &str : source_strings)
-        {
-            moved_strings.emplace_back(std::move(str));
-        }
-
-        benchmark::DoNotOptimize(moved_strings);
-        benchmark::ClobberMemory();
-    }
-
-    state.SetItemsProcessed(state.iterations() * count);
-    state.SetBytesProcessed(state.iterations() * count * string_length);
-}
-
-BENCHMARK_TEMPLATE(StringMoveConstruction, std::string)
-    ->Args({1000, 16, 42})
-    ->Args({1000, 256, 42})
-    ->Args({10000, 64, 42});
-
-BENCHMARK_TEMPLATE(StringMoveConstruction, gs::german_string)
-    ->Args({1000, 16, 42})
-    ->Args({1000, 256, 42})
-    ->Args({10000, 64, 42});
-
-// 3. String Equality Comparison Performance
 template <typename StringType>
 void StringEqualityComparison(benchmark::State &state)
 {
@@ -261,14 +201,17 @@ void StringEqualityComparison(benchmark::State &state)
 BENCHMARK_TEMPLATE(StringEqualityComparison, std::string)
     ->Args({1000, 8, 1024, 42})
     ->Args({10000, 8, 1024, 42})
-    ->Args({100000, 8, 1024, 42});
+    ->Args({100000, 8, 1024, 42})
+    ->Args({500000, 8, 1024, 42})
+    ->Args({1000000, 8, 1024, 42});
 
 BENCHMARK_TEMPLATE(StringEqualityComparison, gs::german_string)
     ->Args({1000, 8, 1024, 42})
     ->Args({10000, 8, 1024, 42})
-    ->Args({100000, 8, 1024, 42});
+    ->Args({100000, 8, 1024, 42})
+    ->Args({500000, 8, 1024, 42})
+    ->Args({1000000, 8, 1024, 42});
 
-// 4. String Comparison (Lexicographic Ordering)
 template <typename StringType>
 void StringLexicographicComparison(benchmark::State &state)
 {
@@ -299,14 +242,17 @@ void StringLexicographicComparison(benchmark::State &state)
 BENCHMARK_TEMPLATE(StringLexicographicComparison, std::string)
     ->Args({1000, 8, 128, 42})
     ->Args({10000, 8, 128, 42})
-    ->Args({100000, 8, 128, 42});
+    ->Args({100000, 8, 128, 42})
+    ->Args({500000, 8, 128, 42})
+    ->Args({1000000, 8, 128, 42});
 
 BENCHMARK_TEMPLATE(StringLexicographicComparison, gs::german_string)
     ->Args({1000, 8, 128, 42})
     ->Args({10000, 8, 128, 42})
-    ->Args({100000, 8, 128, 42});
+    ->Args({100000, 8, 128, 42})
+    ->Args({500000, 8, 128, 42})
+    ->Args({1000000, 8, 128, 42});
 
-// 5. String Sorting Performance
 template <typename StringType>
 void StringSorting(benchmark::State &state)
 {
@@ -325,6 +271,7 @@ void StringSorting(benchmark::State &state)
         benchmark::DoNotOptimize(strings);
         std::sort(strings.rbegin(), strings.rend());
         benchmark::DoNotOptimize(strings);
+        benchmark::ClobberMemory();
     }
 
     state.SetItemsProcessed(state.iterations() * count);
@@ -333,14 +280,17 @@ void StringSorting(benchmark::State &state)
 BENCHMARK_TEMPLATE(StringSorting, std::string)
     ->Args({1000, 8, 128, 42})
     ->Args({10000, 8, 128, 42})
-    ->Args({50000, 8, 128, 42});
+    ->Args({50000, 8, 128, 42})
+    ->Args({100000, 8, 128, 42})
+    ->Args({200000, 8, 128, 42});
 
 BENCHMARK_TEMPLATE(StringSorting, gs::german_string)
     ->Args({1000, 8, 128, 42})
     ->Args({10000, 8, 128, 42})
-    ->Args({50000, 8, 128, 42});
+    ->Args({50000, 8, 128, 42})
+    ->Args({100000, 8, 128, 42})
+    ->Args({200000, 8, 128, 42});
 
-// 6. String Length Scenarios
 template <typename StringType>
 void StringComparisonByLength(benchmark::State &state)
 {
@@ -377,7 +327,8 @@ BENCHMARK_TEMPLATE(StringComparisonByLength, std::string)
     ->Arg(128)
     ->Arg(256)
     ->Arg(512)
-    ->Arg(1024);
+    ->Arg(1024)
+    ->Arg(2048);
 
 BENCHMARK_TEMPLATE(StringComparisonByLength, gs::german_string)
     ->Arg(4)
@@ -389,128 +340,7 @@ BENCHMARK_TEMPLATE(StringComparisonByLength, gs::german_string)
     ->Arg(128)
     ->Arg(256)
     ->Arg(512)
-    ->Arg(1024);
-
-// 7. String Class Type Comparison (German String specific)
-void GermanStringClassComparison(benchmark::State &state)
-{
-    size_t count = state.range(0);
-    uint32_t string_length = static_cast<uint32_t>(state.range(1));
-    uint32_t seed = static_cast<uint32_t>(state.range(2));
-    int string_class_type = static_cast<int>(state.range(3)); // 0=temporary, 1=persistent, 2=transient
-
-    auto template_strings = generate_random_strings<std::string>(count, string_length, string_length, seed);
-
-    for (auto _ : state)
-    {
-        std::vector<gs::german_string> strings;
-        strings.reserve(count);
-
-        for (const auto &str : template_strings)
-        {
-            switch (string_class_type)
-            {
-            case 0:
-                strings.emplace_back(str.c_str(), static_cast<uint32_t>(str.length()), gs::temporary_t{});
-                break;
-            case 1:
-                strings.emplace_back(str.c_str(), static_cast<uint32_t>(str.length()), gs::persistent_t{});
-                break;
-            case 2:
-                strings.emplace_back(str.c_str(), static_cast<uint32_t>(str.length()), gs::transient_t{});
-                break;
-            }
-        }
-        benchmark::DoNotOptimize(strings);
-        benchmark::ClobberMemory();
-    }
-
-    state.SetItemsProcessed(state.iterations() * count);
-    state.SetLabel(string_class_type == 0 ? "temporary" : string_class_type == 1 ? "persistent"
-                                                                                 : "transient");
-}
-
-BENCHMARK(GermanStringClassComparison)
-    ->Args({1000, 64, 42, 0})   // temporary
-    ->Args({1000, 64, 42, 1})   // persistent
-    ->Args({1000, 64, 42, 2})   // transient
-    ->Args({10000, 64, 42, 0})  // temporary
-    ->Args({10000, 64, 42, 1})  // persistent
-    ->Args({10000, 64, 42, 2}); // transient
-
-// 8. Prefix Comparison Benchmark (German String optimization)
-void GermanStringPrefixComparison(benchmark::State &state)
-{
-    uint32_t string_length = static_cast<uint32_t>(state.range(0));
-    uint32_t shared_prefix_length = static_cast<uint32_t>(state.range(1));
-    uint32_t seed = static_cast<uint32_t>(state.range(2));
-
-    std::string prefix(shared_prefix_length, 'A');
-    std::string suffix1(string_length - shared_prefix_length, 'B');
-    std::string suffix2(string_length - shared_prefix_length, 'C');
-
-    std::string str1 = prefix + suffix1;
-    std::string str2 = prefix + suffix2;
-
-    gs::german_string gs_str1(str1.c_str(), static_cast<uint32_t>(str1.length()), gs::persistent_t{});
-    gs::german_string gs_str2(str2.c_str(), static_cast<uint32_t>(str2.length()), gs::persistent_t{});
-
-    for (auto _ : state)
-    {
-        for (int i = 0; i < 1000; ++i)
-        {
-            bool result = (gs_str1 < gs_str2);
-            benchmark::DoNotOptimize(result);
-        }
-        benchmark::ClobberMemory();
-    }
-
-    state.SetItemsProcessed(state.iterations() * 1000);
-    state.SetLabel("prefix=" + std::to_string(shared_prefix_length) + "/" + std::to_string(string_length));
-}
-
-BENCHMARK(GermanStringPrefixComparison)
-    ->Args({16, 0, 42})   // No shared prefix
-    ->Args({16, 4, 42})   // 4-byte shared prefix (fits in prefix optimization)
-    ->Args({16, 8, 42})   // 8-byte shared prefix
-    ->Args({32, 0, 42})   // No shared prefix, longer strings
-    ->Args({32, 4, 42})   // 4-byte shared prefix, longer strings
-    ->Args({32, 16, 42})  // 16-byte shared prefix, longer strings
-    ->Args({64, 0, 42})   // No shared prefix, much longer strings
-    ->Args({64, 4, 42})   // 4-byte shared prefix, much longer strings
-    ->Args({64, 32, 42}); // 32-byte shared prefix, much longer strings
-
-// 9. Small String Optimization Boundary
-void GermanStringSmallStringBoundary(benchmark::State &state)
-{
-    uint32_t string_length = static_cast<uint32_t>(state.range(0));
-
-    std::string test_string(string_length, 'A');
-
-    for (auto _ : state)
-    {
-        for (int i = 0; i < 1000; ++i)
-        {
-            gs::german_string gs_str(test_string.c_str(), string_length, gs::persistent_t{});
-            benchmark::DoNotOptimize(gs_str);
-        }
-        benchmark::ClobberMemory();
-    }
-
-    state.SetItemsProcessed(state.iterations() * 1000);
-    state.SetLabel(string_length <= 12 ? "small" : "large");
-}
-
-BENCHMARK(GermanStringSmallStringBoundary)
-    ->Arg(1)
-    ->Arg(4)
-    ->Arg(8)
-    ->Arg(11)
-    ->Arg(12)
-    ->Arg(13)
-    ->Arg(16)
-    ->Arg(24)
-    ->Arg(32)
-    ->Arg(64);
+    ->Arg(1024)
+    ->Arg(2048);
 
 BENCHMARK_MAIN();

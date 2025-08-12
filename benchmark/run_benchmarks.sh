@@ -123,7 +123,7 @@ if [[ "$COMPILER" == "clang" && "$STDLIB" == "libcxx" ]]; then
 elif [[ "$COMPILER" == "clang" && "$STDLIB" == "libstdcxx" ]]; then
     BUILD_PRESET="clang-20"
 elif [[ "$COMPILER" == "gcc" ]]; then
-    BUILD_PRESET="gcc-13"
+    BUILD_PRESET="gcc-11"
 else
     print_colored $RED "Error: Unsupported compiler/stdlib combination: $COMPILER/$STDLIB"
     exit 1
