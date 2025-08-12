@@ -1,0 +1,309 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <chrono>
+#include <random>
+#include <unordered_set>
+#include <set>
+
+#include <benchmark/benchmark.h>
+
+#include "german_string.h"
+
+// Micro-benchmarks focusing on specific german_string features
+
+// 1. Small String Optimization Boundary Testing
+void GermanStringSmallStringBoundary(benchmark::State &state)
+{
+    uint32_t string_length = static_cast<uint32_t>(state.range(0));
+    
+    std::string test_string(string_length, 'A');
+    
+    for (auto _ : state)
+    {
+        for (int i = 0; i < 1000; ++i)
+        {
+            gs::german_string gs_str(test_string.c_str(), string_length, gs::persistent_t{});
+            benchmark::DoNotOptimize(gs_str);
+        }
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * 1000);
+    state.SetLabel(string_length <= 12 ? "small" : "large");
+}
+
+BENCHMARK(GermanStringSmallStringBoundary)
+    ->Arg(1)->Arg(4)->Arg(8)->Arg(11)->Arg(12)->Arg(13)->Arg(16)->Arg(24)->Arg(32)->Arg(64);
+
+// 2. Prefix Comparison Performance
+void GermanStringPrefixComparison(benchmark::State &state)
+{
+    uint32_t string_length = static_cast<uint32_t>(state.range(0));
+    uint32_t shared_prefix_length = static_cast<uint32_t>(state.range(1));
+    
+    std::string prefix(shared_prefix_length, 'A');
+    std::string suffix1(string_length - shared_prefix_length, 'B');
+    std::string suffix2(string_length - shared_prefix_length, 'C');
+    
+    std::string str1 = prefix + suffix1;
+    std::string str2 = prefix + suffix2;
+    
+    gs::german_string gs_str1(str1.c_str(), static_cast<uint32_t>(str1.length()), gs::persistent_t{});
+    gs::german_string gs_str2(str2.c_str(), static_cast<uint32_t>(str2.length()), gs::persistent_t{});
+    
+    for (auto _ : state)
+    {
+        for (int i = 0; i < 1000; ++i)
+        {
+            bool result = (gs_str1 < gs_str2);
+            benchmark::DoNotOptimize(result);
+        }
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * 1000);
+}
+
+BENCHMARK(GermanStringPrefixComparison)
+    ->Args({16, 0})   // No shared prefix
+    ->Args({16, 4})   // 4-byte shared prefix (fits in prefix optimization)
+    ->Args({16, 8})   // 8-byte shared prefix  
+    ->Args({32, 0})   // No shared prefix, longer strings
+    ->Args({32, 4})   // 4-byte shared prefix, longer strings
+    ->Args({32, 16})  // 16-byte shared prefix, longer strings
+    ->Args({64, 0})   // No shared prefix, much longer strings
+    ->Args({64, 4})   // 4-byte shared prefix, much longer strings
+    ->Args({64, 32}); // 32-byte shared prefix, much longer strings
+
+// 3. Equality Check Performance (Same vs Different lengths)
+void GermanStringEqualityLength(benchmark::State &state)
+{
+    uint32_t length1 = static_cast<uint32_t>(state.range(0));
+    uint32_t length2 = static_cast<uint32_t>(state.range(1));
+    
+    std::string str1(length1, 'A');
+    std::string str2(length2, 'B');
+    
+    gs::german_string gs_str1(str1.c_str(), length1, gs::persistent_t{});
+    gs::german_string gs_str2(str2.c_str(), length2, gs::persistent_t{});
+    
+    for (auto _ : state)
+    {
+        for (int i = 0; i < 1000; ++i)
+        {
+            bool result = (gs_str1 == gs_str2);
+            benchmark::DoNotOptimize(result);
+        }
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * 1000);
+    state.SetLabel(length1 == length2 ? "same_length" : "diff_length");
+}
+
+BENCHMARK(GermanStringEqualityLength)
+    ->Args({16, 16})   // Same length
+    ->Args({16, 32})   // Different length
+    ->Args({32, 32})   // Same length
+    ->Args({32, 64})   // Different length
+    ->Args({64, 64})   // Same length
+    ->Args({64, 128}); // Different length
+
+// 4. Hash Performance for different string types
+template <typename StringType>
+void StringHashPerformance(benchmark::State &state)
+{
+    uint32_t string_length = static_cast<uint32_t>(state.range(0));
+    uint32_t count = static_cast<uint32_t>(state.range(1));
+    
+    std::vector<StringType> strings;
+    strings.reserve(count);
+    
+    std::mt19937 gen(42);
+    std::uniform_int_distribution<> char_dist('a', 'z');
+    
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        std::string temp_str;
+        temp_str.reserve(string_length);
+        for (uint32_t j = 0; j < string_length; ++j)
+        {
+            temp_str += static_cast<char>(char_dist(gen));
+        }
+        
+        if constexpr (std::is_same_v<StringType, std::string>)
+        {
+            strings.emplace_back(temp_str);
+        }
+        else
+        {
+            strings.emplace_back(temp_str.c_str(), static_cast<uint32_t>(temp_str.length()), gs::persistent_t{});
+        }
+    }
+    
+    for (auto _ : state)
+    {
+        std::unordered_set<StringType> hash_set;
+        hash_set.reserve(count);
+        for (const auto &str : strings)
+        {
+            hash_set.insert(str);
+        }
+        benchmark::DoNotOptimize(hash_set);
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * count);
+}
+
+BENCHMARK_TEMPLATE(StringHashPerformance, std::string)
+    ->Args({16, 1000})
+    ->Args({32, 1000})
+    ->Args({64, 1000})
+    ->Args({16, 10000})
+    ->Args({32, 10000});
+
+BENCHMARK_TEMPLATE(StringHashPerformance, gs::german_string)
+    ->Args({16, 1000})
+    ->Args({32, 1000})
+    ->Args({64, 1000})
+    ->Args({16, 10000})
+    ->Args({32, 10000});
+
+// 5. Memory Layout Effects - Cache Performance
+void GermanStringCachePerformance(benchmark::State &state)
+{
+    uint32_t count = static_cast<uint32_t>(state.range(0));
+    uint32_t string_length = static_cast<uint32_t>(state.range(1));
+    bool random_access = state.range(2) == 1;
+    
+    std::vector<gs::german_string> strings;
+    strings.reserve(count);
+    
+    std::string template_str(string_length, 'A');
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        // Vary the last character to make strings different
+        template_str.back() = 'A' + (i % 26);
+        strings.emplace_back(template_str.c_str(), string_length, gs::persistent_t{});
+    }
+    
+    std::vector<uint32_t> access_pattern;
+    access_pattern.reserve(count);
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        access_pattern.push_back(i);
+    }
+    
+    if (random_access)
+    {
+        std::mt19937 gen(42);
+        std::shuffle(access_pattern.begin(), access_pattern.end(), gen);
+    }
+    
+    for (auto _ : state)
+    {
+        size_t comparison_count = 0;
+        for (uint32_t i = 0; i < count - 1; ++i)
+        {
+            uint32_t idx1 = access_pattern[i];
+            uint32_t idx2 = access_pattern[i + 1];
+            if (strings[idx1] == strings[idx2])
+            {
+                ++comparison_count;
+            }
+        }
+        benchmark::DoNotOptimize(comparison_count);
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * (count - 1));
+    state.SetLabel(random_access ? "random_access" : "sequential_access");
+}
+
+BENCHMARK(GermanStringCachePerformance)
+    ->Args({1000, 32, 0})   // Sequential access
+    ->Args({1000, 32, 1})   // Random access
+    ->Args({10000, 32, 0})  // Sequential access, more strings
+    ->Args({10000, 32, 1})  // Random access, more strings
+    ->Args({1000, 128, 0})  // Sequential access, longer strings
+    ->Args({1000, 128, 1}); // Random access, longer strings
+
+// 6. String Class Type Impact on Performance
+void GermanStringClassPerformance(benchmark::State &state)
+{
+    uint32_t count = static_cast<uint32_t>(state.range(0));
+    uint32_t string_length = static_cast<uint32_t>(state.range(1));
+    int class_type = static_cast<int>(state.range(2)); // 0=temp, 1=persistent, 2=transient
+    
+    std::vector<std::string> source_strings;
+    source_strings.reserve(count);
+    
+    std::mt19937 gen(42);
+    std::uniform_int_distribution<> char_dist('a', 'z');
+    
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        std::string temp_str;
+        temp_str.reserve(string_length);
+        for (uint32_t j = 0; j < string_length; ++j)
+        {
+            temp_str += static_cast<char>(char_dist(gen));
+        }
+        source_strings.emplace_back(temp_str);
+    }
+    
+    for (auto _ : state)
+    {
+        std::vector<gs::german_string> strings;
+        strings.reserve(count);
+        
+        for (const auto &source : source_strings)
+        {
+            switch (class_type)
+            {
+                case 0:
+                    strings.emplace_back(source.c_str(), static_cast<uint32_t>(source.length()), gs::temporary_t{});
+                    break;
+                case 1:
+                    strings.emplace_back(source.c_str(), static_cast<uint32_t>(source.length()), gs::persistent_t{});
+                    break;
+                case 2:
+                    strings.emplace_back(source.c_str(), static_cast<uint32_t>(source.length()), gs::transient_t{});
+                    break;
+            }
+        }
+        
+        // Perform some operations on the strings
+        size_t comparison_count = 0;
+        for (size_t i = 0; i < strings.size() - 1; ++i)
+        {
+            if (strings[i] == strings[i + 1])
+            {
+                ++comparison_count;
+            }
+        }
+        
+        benchmark::DoNotOptimize(comparison_count);
+        benchmark::DoNotOptimize(strings);
+        benchmark::ClobberMemory();
+    }
+    
+    state.SetItemsProcessed(state.iterations() * count);
+    state.SetLabel(class_type == 0 ? "temporary" : 
+                   class_type == 1 ? "persistent" : "transient");
+}
+
+BENCHMARK(GermanStringClassPerformance)
+    ->Args({1000, 32, 0})  // temporary
+    ->Args({1000, 32, 1})  // persistent
+    ->Args({1000, 32, 2})  // transient
+    ->Args({5000, 32, 0})  // temporary, more strings
+    ->Args({5000, 32, 1})  // persistent, more strings
+    ->Args({5000, 32, 2})  // transient, more strings
+    ->Args({1000, 128, 0}) // temporary, longer strings
+    ->Args({1000, 128, 1}) // persistent, longer strings
+    ->Args({1000, 128, 2}); // transient, longer strings
+
+BENCHMARK_MAIN();
