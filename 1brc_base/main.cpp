@@ -106,6 +106,8 @@ DB process_input(std::span<const char> data)
     std::string station;
     std::string value;
 
+    // Also had to simplify as to not use spanstreams
+
     // Grab the station and the measured value from the input
     for (auto line : data | std::views::split('\n'))
     {
@@ -128,7 +130,7 @@ DB process_input(std::span<const char> data)
         if (it == db.end())
         {
             // If it's not there, insert
-            db.emplace(station, Record{1, fp_value, fp_value, fp_value});
+            db.emplace(std::move(station), Record{1, fp_value, fp_value, fp_value});
             continue;
         }
         // Otherwise update the information
@@ -154,7 +156,7 @@ void format_output(std::ostream &out, const DB &db)
 
     out << std::setiosflags(out.fixed | out.showpoint) << std::setprecision(1);
     out << "{";
-    for (auto &k : names)
+    for (auto &k : names | std::ranges::views::take(10))
     {
         // Print StationName:min/avg/max
         auto &[_, record] = *db.find(k);
@@ -164,11 +166,28 @@ void format_output(std::ostream &out, const DB &db)
     out << "}\n";
 }
 
-int main()
-{
-    MappedFile mfile("measurements.txt");
-    std::ispanstream ifile(mfile.data());
+// Had to modify the code a bit because spanstreams do not have a wide compiler suuport yet
+// Not in the latest Clang, nor in GCC 13
 
-    auto db = process_input(ifile);
-    format_output(std::cout, db);
+int main(int argc, char *argv[])
+{
+    if (argc != 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <input_file>\n";
+        return 1;
+    }
+
+    try
+    {
+        MappedFile mfile(argv[1]);
+        auto db = process_input(mfile.data());
+        format_output(std::cout, db);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+
+    return 0;
 }

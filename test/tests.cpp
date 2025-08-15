@@ -391,6 +391,22 @@ TEST(GermanStrings, Classes)
     }
 }
 
+// Hasher tests
+TEST(GermanStrings, Hasher)
+{
+    gs::german_string str1("Hello");
+    gs::german_string str2("Hello");
+    gs::german_string str3("World");
+    gs::german_string str4("Hello, World!");
+    gs::german_string str5("Hello, World!");
+
+    std::hash<gs::german_string> hasher;
+    EXPECT_EQ(hasher(str1), hasher(str2)); // Same strings should hash to the same value
+    EXPECT_NE(hasher(str1), hasher(str3)); // Different strings
+    EXPECT_NE(hasher(str1), hasher(str4)); // Different lengths
+    EXPECT_EQ(hasher(str4), hasher(str5)); // Same content, different lengths
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

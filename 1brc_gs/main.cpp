@@ -1,94 +1,190 @@
-// #include <algorithm>
-// #include <cstdint>
-// #include <fstream>
-// #include <iomanip>
-// #include <iostream>
-// #include <ranges>
-// #include <string>
-// #include <unordered_map>
-// #include <utility>
-// #include <vector>
+#include <algorithm>
+#include <fcntl.h>
+#include <filesystem>
+#include <iomanip>
+#include <iostream>
+#include <ranges>
+#include <string>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <system_error>
+#include <unistd.h>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include <span>
+#include <charconv>
 
-// #include "german_string.h"
+#include "german_string.h"
 
-// struct Record
-// {
-//     uint64_t cnt;
-//     double sum;
+// A move-only helper
+template <typename T, T empty = T{}>
+struct MoveOnly
+{
+    MoveOnly() : store_(empty) {}
+    MoveOnly(T value) : store_(value) {}
+    MoveOnly(MoveOnly &&other) : store_(std::exchange(other.store_, empty)) {}
+    MoveOnly &operator=(MoveOnly &&other)
+    {
+        store_ = std::exchange(other.store_, empty);
+        return *this;
+    }
+    operator T() const { return store_; }
+    T get() const { return store_; }
 
-//     float min;
-//     float max;
-// };
+private:
+    T store_;
+};
 
-// using DB = std::unordered_map<gs::german_string, Record>;
+struct FileFD
+{
+    FileFD(const std::filesystem::path &file_path)
+        : fd_(open(file_path.c_str(), O_RDONLY))
+    {
+        if (fd_ == -1)
+            throw std::system_error(errno, std::system_category(),
+                                    "Failed to open file");
+    }
 
-// DB process_input(std::istream &in)
-// {
-//     DB db;
+    ~FileFD()
+    {
+        if (fd_ >= 0)
+            close(fd_);
+    }
 
-//     gs::german_string station;
-//     gs::german_string value;
+    int get() const { return fd_.get(); }
 
-//     // Grab the station and the measured value from the input
-//     while (std::getline(in, station, ';') && std::getline(in, value, '\n'))
-//     {
-//         // Convert the measured value into a floating point
-//         float fp_value = std::stof(value);
+private:
+    MoveOnly<int, -1> fd_;
+};
 
-//         // Lookup the station in our database
-//         auto it = db.find(station);
-//         if (it == db.end())
-//         {
-//             // If it's not there, insert
-//             db.emplace(station, Record{1, fp_value, fp_value, fp_value});
-//             continue;
-//         }
-//         // Otherwise update the information
-//         it->second.min = std::min(it->second.min, fp_value);
-//         it->second.max = std::max(it->second.max, fp_value);
-//         it->second.sum += fp_value;
-//         ++it->second.cnt;
-//     }
+struct MappedFile
+{
+    MappedFile(const std::filesystem::path &file_path) : fd_(file_path)
+    {
+        // Determine the filesize (needed for mmap)
+        struct stat sb;
+        if (fstat(fd_.get(), &sb) == 1)
+            throw std::system_error(errno, std::system_category(),
+                                    "Failed to read file stats");
+        sz_ = sb.st_size;
 
-//     return db;
-// }
+        begin_ = static_cast<char *>(
+            mmap(NULL, sz_, PROT_READ, MAP_PRIVATE, fd_.get(), 0));
+        if (begin_ == MAP_FAILED)
+            throw std::system_error(errno, std::system_category(),
+                                    "Failed to map file to memory");
+    }
 
-// void format_output(std::ostream &out, const DB &db)
-// {
-//     std::vector<std::string> names(db.size());
-//     // Grab all the unique station names
-//     std::ranges::copy(db | std::views::keys, names.begin());
-//     // Sorting UTF-8 strings lexicographically is the same
-//     // as sorting by codepoint value
-//     std::ranges::sort(names);
+    ~MappedFile()
+    {
+        if (begin_ != nullptr)
+            munmap(begin_, sz_);
+    }
 
-//     std::string delim = "";
+    // The entire file content as a std::span
+    std::span<const char> data() const { return {begin_.get(), sz_.get()}; }
 
-//     out << std::setiosflags(out.fixed | out.showpoint) << std::setprecision(1);
-//     out << "{";
-//     for (auto &k : std::ranges::take_view(names, 5))
-//     {
+private:
+    FileFD fd_;
+    MoveOnly<char *> begin_;
+    MoveOnly<size_t> sz_;
+};
 
-//         // Print StationName:min/avg/max
-//         auto &[_, record] = *db.find(k);
-//         out << std::exchange(delim, ", ") << k << "=" << record.min << "/"
-//             << (record.sum / record.cnt) << "/" << record.max;
-//     }
-//     out << "}\n";
-// }
+struct Record
+{
+    uint64_t cnt;
+    double sum;
 
-// int main(int argc, char *argv[])
-// {
-//     if (argc != 2)
-//     {
-//         std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
-//         return 1;
-//     }
+    float min;
+    float max;
+};
 
-//     std::ifstream ifile(argv[1]);
-//     if (not ifile.is_open())
-//         throw std::runtime_error("Failed to open the input file.");
+using DB = std::unordered_map<gs::german_string, Record>;
 
-//     auto db = process_input(ifile);
-//     format_output(std::cout, db);
-// }
+DB process_input(std::span<const char> data)
+{
+    DB db;
+    // Grab the station and the measured value from the input
+    for (auto line : data | std::views::split('\n'))
+    {
+        // Each line is split into station and value
+        auto delim_pos = std::ranges::find(line, ';');
+        if (delim_pos == line.end())
+            continue;
+
+        auto line_length = std::distance(line.begin(), delim_pos);
+        auto delim_offset = std::distance(line.begin(), delim_pos);
+        gs::german_string station = gs::german_string(line.data(), delim_offset, gs::string_class::transient);
+        gs::german_string value = gs::german_string(line.data() + delim_offset + 1, line_length - delim_offset - 1, gs::string_class::transient);
+
+        // Convert the measured value into a floating point
+        float fp_value = 0.0f;
+        std::from_chars(value.data(), value.data() + value.size(), fp_value);
+
+        // Lookup the station in our database
+        auto it = db.find(station);
+        if (it == db.end())
+        {
+            // If it's not there, insert
+            db.emplace(station, Record{1, fp_value, fp_value, fp_value});
+            continue;
+        }
+        // Otherwise update the information
+        it->second.min = std::min(it->second.min, fp_value);
+        it->second.max = std::max(it->second.max, fp_value);
+        it->second.sum += fp_value;
+        ++it->second.cnt;
+    }
+
+    return db;
+}
+
+void format_output(std::ostream &out, const DB &db)
+{
+    std::vector<gs::german_string> names(db.size());
+    // Grab all the unique station names
+    std::ranges::copy(db | std::views::keys, names.begin());
+    // Sorting UTF-8 strings lexicographically is the same
+    // as sorting by codepoint value
+    std::ranges::sort(names);
+
+    std::string delim = "";
+
+    out << std::setiosflags(out.fixed | out.showpoint) << std::setprecision(1);
+    out << "{";
+    for (auto &k : names | std::ranges::views::take(10))
+    {
+        // Print StationName:min/avg/max
+        auto &[_, record] = *db.find(k);
+        out << std::exchange(delim, ", ") << k.as_string_view() << "=" << record.min << "/"
+            << (record.sum / record.cnt) << "/" << record.max;
+    }
+    out << "}\n";
+}
+
+// Had to modify the code a bit because spanstreams do not have a wide compiler suuport yet
+// Not in the latest Clang, nor in GCC 13
+
+int main(int argc, char *argv[])
+{
+    if (argc != 2)
+    {
+        std::cerr << "Usage: " << argv[0] << " <input_file>\n";
+        return 1;
+    }
+
+    try
+    {
+        MappedFile mfile(argv[1]);
+        auto db = process_input(mfile.data());
+        format_output(std::cout, db);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+
+    return 0;
+}

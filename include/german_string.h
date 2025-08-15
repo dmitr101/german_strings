@@ -318,6 +318,20 @@ namespace gs
             }
         }
 
+        basic_german_string(const basic_german_string &other) noexcept
+            : _impl(other._impl)
+        {
+            if (other.get_class() == string_class::temporary)
+            {
+                *this = other.copy_to_temporary();
+            }
+            else
+            {
+                _impl._state[0] = other._impl._state[0];
+                _impl._state[1] = other._impl._state[1];
+            }
+        }
+
         basic_german_string &operator=(const basic_german_string &) = default;
         basic_german_string &operator=(basic_german_string &&other) noexcept
         {
@@ -334,6 +348,11 @@ namespace gs
         string_class get_class() const
         {
             return _impl._get_class();
+        }
+
+        const char* data() const
+        {
+            return _impl._get_maybe_small_ptr();
         }
 
         size_type size() const
@@ -425,3 +444,13 @@ namespace gs
         }
     } // namespace literals
 }
+
+// TODO: Probably stupid, review later
+template<>
+struct std::hash<gs::german_string>
+{
+    std::size_t operator()(const gs::german_string &s) const noexcept
+    {
+        return std::hash<std::string_view>()(s.as_string_view());
+    }
+};

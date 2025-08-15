@@ -47,8 +47,9 @@ target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest GTest::gtest_ma
 # Add test to CTest
 add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
-# Add 1brc_base target
 add_executable(1brc_base 1brc_base/main.cpp)
+add_executable(1brc_gs 1brc_gs/main.cpp)
+target_link_libraries(1brc_gs PRIVATE ${PROJECT_NAME}_lib)
 
 # Update compiler options for all targets
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -56,6 +57,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(${PROJECT_NAME}_tests PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(1brc_base PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(1brc_gs PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
     target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
 elseif(MSVC)
@@ -63,6 +65,7 @@ elseif(MSVC)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE /W3)
     target_compile_options(${PROJECT_NAME}_tests PRIVATE /W3)
     target_compile_options(1brc_base PRIVATE /W3)
+    target_compile_options(1brc_gs PRIVATE /W3)
 endif()
 
 # Install targets (optional)

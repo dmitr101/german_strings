@@ -53,11 +53,11 @@
             }
         },
         {
-            "name": "gcc-11",
-            "displayName": "GCC 11 Build",
-            "description": "Build with GCC 11 compiler",
+            "name": "gcc-default",
+            "displayName": "Default GCC Build",
+            "description": "Build with the distribution GCC compiler",
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build/gcc-11",
+            "binaryDir": "${sourceDir}/build/gcc-default",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++",
@@ -70,11 +70,11 @@
             }
         },
         {
-            "name": "gcc-11-debug",
-            "displayName": "GCC 11 Debug",
-            "description": "Debug build with GCC 11 compiler",
+            "name": "gcc-default-debug",
+            "displayName": "Default GCC Build Debug",
+            "description": "Debug build with the distribution GCC compiler",
             "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build/gcc-11-debug",
+            "binaryDir": "${sourceDir}/build/gcc-default-debug",
             "cacheVariables": {
                 "CMAKE_C_COMPILER": "gcc",
                 "CMAKE_CXX_COMPILER": "g++",
@@ -178,14 +178,14 @@
             "displayName": "Release Build with Clang 20"
         },
         {
-            "name": "gcc-11",
-            "configurePreset": "gcc-11",
-            "displayName": "Build with GCC 11"
+            "name": "gcc-default",
+            "configurePreset": "gcc-default",
+            "displayName": "Build with Default GCC"
         },
         {
-            "name": "gcc-11-debug",
-            "configurePreset": "gcc-11-debug",
-            "displayName": "Debug Build with GCC 11"
+            "name": "gcc-default-debug",
+            "configurePreset": "gcc-default-debug",
+            "displayName": "Debug Build with Default GCC"
         },
         {
             "name": "clang-20-libcxx",
@@ -215,9 +215,9 @@
             "displayName": "Test with Clang 20"
         },
         {
-            "name": "gcc-11",
-            "configurePreset": "gcc-11",
-            "displayName": "Test with GCC 11"
+            "name": "gcc-default",
+            "configurePreset": "gcc-default",
+            "displayName": "Test with Default GCC"
         },
         {
             "name": "clang-20-libcxx",
