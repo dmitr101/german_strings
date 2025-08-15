@@ -47,30 +47,24 @@ target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest GTest::gtest_ma
 # Add test to CTest
 add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
+# Add 1brc_base target
+add_executable(1brc_base 1brc_base/main.cpp)
+
 # Update compiler options for all targets
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(${PROJECT_NAME}_lib PRIVATE -Wall -Wextra -Wpedantic) # -fsanitize=address -static-libsan)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(${PROJECT_NAME}_tests PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(1brc_base PRIVATE -Wall -Wextra -Wpedantic)
     target_compile_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
     target_link_options(${PROJECT_NAME}_tests PUBLIC -fsanitize=address,undefined)
 elseif(MSVC)
     target_compile_options(${PROJECT_NAME}_lib PRIVATE /W3)
     target_compile_options(${PROJECT_NAME}_benchmarks PRIVATE /W3)
     target_compile_options(${PROJECT_NAME}_tests PRIVATE /W3)
+    target_compile_options(1brc_base PRIVATE /W3)
 endif()
 
-# # Use libc++ if available
-# if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
-#     set(LIBCXX_INCLUDE_DIR "/usr/include/llvm-20/libc++")
-#     set(LIBCXXABI_INCLUDE_DIR "/usr/include/llvm-20/libc++abi")
-#     target_include_directories(${PROJECT_NAME}_lib PRIVATE ${LIBCXX_INCLUDE_DIR} ${LIBCXXABI_INCLUDE_DIR})
-#     target_include_directories(${PROJECT_NAME}_benchmarks PRIVATE ${LIBCXX_INCLUDE_DIR} ${LIBCXXABI_INCLUDE_DIR})
-#     if(TARGET ${PROJECT_NAME}_tests)
-#         target_include_directories(${PROJECT_NAME}_tests PRIVATE ${LIBCXX_INCLUDE_DIR} ${LIBCXXABI_INCLUDE_DIR})
-#     endif()
-# endif()
-
 # Install targets (optional)
-install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks
+install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks 1brc_base
         RUNTIME DESTINATION bin)
