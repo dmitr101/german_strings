@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <limits>
 #include <bit>
+#include <iterator>
 
 // TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
 // TODO: A constructor withj size type being size_t and check if the size fits in 32 bits and panic if it doesn't
@@ -298,6 +299,13 @@ namespace gs
                             string_class cls = string_class::temporary,
                             const TAllocator &allocator = TAllocator())
             : basic_german_string(ptr, detail::_checked_size_cast(std::strlen(ptr)), cls, allocator)
+        {
+        }
+
+        template <std::contiguous_iterator Iter, std::sized_sentinel_for<Iter> Sentinel>
+            requires (std::is_same_v<std::iter_value_t<Iter>, char> && !std::is_convertible_v<Sentinel, size_type>)
+        basic_german_string(Iter First, Sentinel Last) noexcept(noexcept(Last - First))
+            : basic_german_string(std::to_address(First), static_cast<size_type>(Last - First), string_class::transient)
         {
         }
 
