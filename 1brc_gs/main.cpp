@@ -102,29 +102,29 @@ struct Record
 
 using DB = std::unordered_map<gs::german_string, Record>;
 
-DB process_input(std::span<const char> data) {
+// NOTE(dshynkar): Also had to simplify as to not use spanstreams
+DB process_input(std::span<const char> data)
+{
     DB db;
+    // Grab the station and the measured value from the input
+    for (auto line : data | std::views::split('\n'))
+    {
+        // Each line is split into station and value
+        auto delim_pos = std::ranges::find(line, ';');
+        if (delim_pos == line.end())
+            continue;
 
-    auto iter = data.begin();
-
-    while (iter != data.end()) {
-        // Scan for the end of the station name
-        auto semi_col = std::ranges::find(iter, std::unreachable_sentinel, ';');
-        auto station = gs::german_string(iter, semi_col);
-        iter = semi_col + 1;
-
-        // Scan for the end of measured value
-        auto new_line =
-            std::ranges::find(iter, std::unreachable_sentinel, '\n');
-        float fp_value;
-        std::from_chars(iter.base(), new_line.base(), fp_value);
-        iter = new_line + 1;
+        gs::german_string station = gs::german_string(line.begin(), delim_pos);
+        gs::german_string value = gs::german_string(std::next(delim_pos), line.end());
+        // Convert the measured value into a floating point
+        float fp_value = gs::stof(value);
 
         // Lookup the station in our database
         auto it = db.find(station);
-        if (it == db.end()) {
+        if (it == db.end())
+        {
             // If it's not there, insert
-            db.emplace(station, Record{1, fp_value, fp_value, fp_value});
+            db.emplace(std::move(station), Record{1, fp_value, fp_value, fp_value});
             continue;
         }
         // Otherwise update the information
@@ -133,7 +133,6 @@ DB process_input(std::span<const char> data) {
         it->second.sum += fp_value;
         ++it->second.cnt;
     }
-
     return db;
 }
 

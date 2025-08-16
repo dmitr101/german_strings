@@ -99,29 +99,20 @@ struct Record
 
 using DB = std::unordered_map<std::string, Record>;
 
+// NOTE(dshynkar): Also had to simplify as to not use spanstreams
 DB process_input(std::span<const char> data)
 {
     DB db;
-
-    std::string station;
-    std::string value;
-
-    // Also had to simplify as to not use spanstreams
-
     // Grab the station and the measured value from the input
     for (auto line : data | std::views::split('\n'))
     {
-        std::string station;
-        std::string value;
-
         // Each line is split into station and value
         auto delim_pos = std::ranges::find(line, ';');
         if (delim_pos == line.end())
             continue;
 
-        station = std::string(line.begin(), delim_pos);
-        value = std::string(std::next(delim_pos), line.end());
-
+        std::string station = std::string(line.begin(), delim_pos);
+        std::string value = std::string(std::next(delim_pos), line.end());
         // Convert the measured value into a floating point
         float fp_value = std::stof(value);
 
@@ -139,7 +130,6 @@ DB process_input(std::span<const char> data)
         it->second.sum += fp_value;
         ++it->second.cnt;
     }
-
     return db;
 }
 

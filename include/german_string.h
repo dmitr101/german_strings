@@ -8,6 +8,7 @@
 #include <cassert>
 #include <compare>
 #include <concepts>
+#include <charconv>
 #include <stdexcept>
 #include <limits>
 #include <bit>
@@ -303,7 +304,7 @@ namespace gs
         }
 
         template <std::contiguous_iterator Iter, std::sized_sentinel_for<Iter> Sentinel>
-            requires (std::is_same_v<std::iter_value_t<Iter>, char> && !std::is_convertible_v<Sentinel, size_type>)
+            requires(std::is_same_v<std::iter_value_t<Iter>, char> && !std::is_convertible_v<Sentinel, size_type>)
         basic_german_string(Iter First, Sentinel Last) noexcept(noexcept(Last - First))
             : basic_german_string(std::to_address(First), static_cast<size_type>(Last - First), string_class::transient)
         {
@@ -358,7 +359,7 @@ namespace gs
             return _impl._get_class();
         }
 
-        const char* data() const
+        const char *data() const
         {
             return _impl._get_maybe_small_ptr();
         }
@@ -451,10 +452,19 @@ namespace gs
             return german_string(str, static_cast<german_string::size_type>(size), string_class::persistent);
         }
     } // namespace literals
+
+    // TODO: Make this identical to std::stof
+    template <typename Allocator>
+    float stof(const basic_german_string<Allocator> &str, german_string::size_type *pos = 0)
+    {
+        float result = 0.0f;
+        auto fc_result = std::from_chars(str.data(), str.data() + str.size(), result);
+        return result;
+    }
 }
 
 // TODO: Probably stupid, review later
-template<>
+template <>
 struct std::hash<gs::german_string>
 {
     std::size_t operator()(const gs::german_string &s) const noexcept
