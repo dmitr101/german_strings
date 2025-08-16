@@ -99,20 +99,28 @@ struct Record
 
 using DB = std::unordered_map<std::string, Record>;
 
+template <typename String>
+bool getline(std::span<const char> &data, String &line, char delim = '\n')
+{
+    auto pos = std::ranges::find(data, delim);
+    line = String{data.begin(), pos};
+    data = data.subspan(std::distance(data.begin(), pos) + 1);
+    if (pos != data.end())
+        return true;
+    return false;
+}
+
 // NOTE(dshynkar): Also had to simplify as to not use spanstreams
 DB process_input(std::span<const char> data)
 {
     DB db;
-    // Grab the station and the measured value from the input
-    for (auto line : data | std::views::split('\n'))
-    {
-        // Each line is split into station and value
-        auto delim_pos = std::ranges::find(line, ';');
-        if (delim_pos == line.end())
-            continue;
 
-        std::string station = std::string(line.begin(), delim_pos);
-        std::string value = std::string(std::next(delim_pos), line.end());
+    std::string station;
+    std::string value;
+
+    // Grab the station and the measured value from the input
+    while (getline(data, station, ';') && getline(data, value, '\n'))
+    {
         // Convert the measured value into a floating point
         float fp_value = std::stof(value);
 
@@ -121,7 +129,7 @@ DB process_input(std::span<const char> data)
         if (it == db.end())
         {
             // If it's not there, insert
-            db.emplace(std::move(station), Record{1, fp_value, fp_value, fp_value});
+            db.emplace(station, Record{1, fp_value, fp_value, fp_value});
             continue;
         }
         // Otherwise update the information
@@ -130,6 +138,7 @@ DB process_input(std::span<const char> data)
         it->second.sum += fp_value;
         ++it->second.cnt;
     }
+
     return db;
 }
 
