@@ -1,14 +1,10 @@
 #include <algorithm>
-#include <fcntl.h>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <ranges>
 #include <string>
-#include <sys/mman.h>
-#include <sys/stat.h>
 #include <system_error>
-#include <unistd.h>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -17,14 +13,25 @@
 
 #include "german_string.h"
 
+// Platform-specific includes
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#else
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 // A move-only helper
-template <typename T, T empty = T{}>
+template <typename T, T empty = T{} >
 struct MoveOnly
 {
     MoveOnly() : store_(empty) {}
     MoveOnly(T value) : store_(value) {}
-    MoveOnly(MoveOnly &&other) : store_(std::exchange(other.store_, empty)) {}
-    MoveOnly &operator=(MoveOnly &&other)
+    MoveOnly(MoveOnly&& other) : store_(std::exchange(other.store_, empty)) {}
+    MoveOnly& operator=(MoveOnly&& other)
     {
         store_ = std::exchange(other.store_, empty);
         return *this;
@@ -38,12 +45,47 @@ private:
 
 struct FileFD
 {
-    FileFD(const std::filesystem::path &file_path)
+#ifdef _WIN32
+    FileFD(const std::filesystem::path& file_path)
+    {
+        // Convert path to wide string for Windows Unicode support
+        std::wstring wide_path = file_path.wstring();
+
+        fd_ = CreateFileW(
+            wide_path.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ,
+            nullptr,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            nullptr
+        );
+
+        if (fd_ == INVALID_HANDLE_VALUE)
+        {
+            DWORD error = GetLastError();
+            throw std::system_error(static_cast<int>(error), std::system_category(),
+                "Failed to open file");
+        }
+    }
+
+    ~FileFD()
+    {
+        if (fd_ != INVALID_HANDLE_VALUE)
+            CloseHandle(fd_);
+    }
+
+    HANDLE get() const { return fd_.get(); }
+
+private:
+    MoveOnly<HANDLE, INVALID_HANDLE_VALUE> fd_;
+#else
+    FileFD(const std::filesystem::path& file_path)
         : fd_(open(file_path.c_str(), O_RDONLY))
     {
         if (fd_ == -1)
             throw std::system_error(errno, std::system_category(),
-                                    "Failed to open file");
+                "Failed to open file");
     }
 
     ~FileFD()
@@ -56,24 +98,90 @@ struct FileFD
 
 private:
     MoveOnly<int, -1> fd_;
+#endif
 };
 
 struct MappedFile
 {
-    MappedFile(const std::filesystem::path &file_path) : fd_(file_path)
+#ifdef _WIN32
+    MappedFile(const std::filesystem::path& file_path) : fd_(file_path)
+    {
+        // Get file size
+        LARGE_INTEGER file_size;
+        if (!GetFileSizeEx(fd_.get(), &file_size))
+        {
+            DWORD error = GetLastError();
+            throw std::system_error(static_cast<int>(error), std::system_category(),
+                "Failed to get file size");
+        }
+        sz_ = static_cast<size_t>(file_size.QuadPart);
+
+        // Create file mapping
+        mapping_ = CreateFileMappingW(
+            fd_.get(),
+            nullptr,
+            PAGE_READONLY,
+            0,  // High-order DWORD of maximum size
+            0,  // Low-order DWORD of maximum size (0 = entire file)
+            nullptr  // Mapping object name
+        );
+
+        if (mapping_ == nullptr)
+        {
+            DWORD error = GetLastError();
+            throw std::system_error(static_cast<int>(error), std::system_category(),
+                "Failed to create file mapping");
+        }
+
+        // Map view of file
+        begin_ = static_cast<char*>(MapViewOfFile(
+            mapping_,
+            FILE_MAP_READ,
+            0,  // High-order DWORD of file offset
+            0,  // Low-order DWORD of file offset
+            0   // Number of bytes to map (0 = entire file)
+        ));
+
+        if (begin_ == nullptr)
+        {
+            DWORD error = GetLastError();
+            CloseHandle(mapping_);
+            throw std::system_error(static_cast<int>(error), std::system_category(),
+                "Failed to map view of file");
+        }
+    }
+
+    ~MappedFile()
+    {
+        if (begin_ != nullptr)
+            UnmapViewOfFile(begin_.get());
+        if (mapping_ != nullptr)
+            CloseHandle(mapping_);
+    }
+
+    // The entire file content as a std::span
+    std::span<const char> data() const { return { begin_.get(), sz_.get() }; }
+
+private:
+    FileFD fd_;
+    HANDLE mapping_ = nullptr;
+    MoveOnly<char*> begin_;
+    MoveOnly<size_t> sz_;
+#else
+    MappedFile(const std::filesystem::path& file_path) : fd_(file_path)
     {
         // Determine the filesize (needed for mmap)
         struct stat sb;
-        if (fstat(fd_.get(), &sb) == 1)
+        if (fstat(fd_.get(), &sb) == -1)
             throw std::system_error(errno, std::system_category(),
-                                    "Failed to read file stats");
+                "Failed to read file stats");
         sz_ = sb.st_size;
 
-        begin_ = static_cast<char *>(
-            mmap(NULL, sz_, PROT_READ, MAP_PRIVATE, fd_.get(), 0));
+        begin_ = static_cast<char*>
+            (mmap(nullptr, sz_, PROT_READ, MAP_PRIVATE, fd_.get(), 0));
         if (begin_ == MAP_FAILED)
             throw std::system_error(errno, std::system_category(),
-                                    "Failed to map file to memory");
+                "Failed to map file to memory");
     }
 
     ~MappedFile()
@@ -83,12 +191,13 @@ struct MappedFile
     }
 
     // The entire file content as a std::span
-    std::span<const char> data() const { return {begin_.get(), sz_.get()}; }
+    std::span<const char> data() const { return { begin_.get(), sz_.get() }; }
 
 private:
     FileFD fd_;
-    MoveOnly<char *> begin_;
+    MoveOnly<char*> begin_;
     MoveOnly<size_t> sz_;
+#endif
 };
 
 struct Record

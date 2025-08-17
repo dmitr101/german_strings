@@ -455,7 +455,7 @@ namespace gs
 
     // TODO: Make this identical to std::stof
     template <typename Allocator>
-    float stof(const basic_german_string<Allocator> &str, german_string::size_type *pos = 0)
+    GS_FORCEINLINE float stof(const basic_german_string<Allocator> &str, german_string::size_type *pos = 0)
     {
         float result = 0.0f;
         auto fc_result = std::from_chars(str.data(), str.data() + str.size(), result);

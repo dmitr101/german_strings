@@ -151,10 +151,157 @@
             }
         },
         {
+            "name": "msvc-2022",
+            "displayName": "MSVC 2022 Build",
+            "description": "Build with MSVC 2022 compiler",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/msvc-2022",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        },
+        {
+            "name": "msvc-2022-debug",
+            "displayName": "MSVC 2022 Debug",
+            "description": "Debug build with MSVC 2022 compiler",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/msvc-2022-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        },
+        {
+            "name": "msvc-2022-release",
+            "displayName": "MSVC 2022 Release",
+            "description": "Release build with MSVC 2022 compiler",
+            "generator": "Visual Studio 17 2022",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build/msvc-2022-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            }
+        },
+        {
+            "name": "msvc-ninja",
+            "displayName": "MSVC with Ninja",
+            "description": "Build with MSVC using Ninja generator",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-ninja",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "msvc-ninja-debug",
+            "displayName": "MSVC Debug with Ninja",
+            "description": "Debug build with MSVC using Ninja generator",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-ninja-debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "msvc-ninja-release",
+            "displayName": "MSVC Release with Ninja",
+            "description": "Release build with MSVC using Ninja generator",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/msvc-ninja-release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "clang-cl",
+            "displayName": "Clang-cl Build",
+            "description": "Build with Clang-cl compiler (Clang with MSVC compatibility)",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/clang-cl",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "clang-cl-debug",
+            "displayName": "Clang-cl Debug",
+            "description": "Debug build with Clang-cl compiler",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/clang-cl-debug",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
+            "name": "clang-cl-release",
+            "displayName": "Clang-cl Release",
+            "description": "Release build with Clang-cl compiler",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/clang-cl-release",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+                "VCPKG_TARGET_TRIPLET": "x64-windows"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
             "name": "default",
             "displayName": "Default Build",
             "description": "Default build with system compiler",
-            "generator": "Unix Makefiles",
+            "generator": "Ninja",
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
@@ -204,6 +351,51 @@
             "displayName": "Release Build with Clang 20 + libc++"
         },
         {
+            "name": "msvc-2022",
+            "configurePreset": "msvc-2022",
+            "displayName": "Build with MSVC 2022"
+        },
+        {
+            "name": "msvc-2022-debug",
+            "configurePreset": "msvc-2022-debug",
+            "displayName": "Debug Build with MSVC 2022"
+        },
+        {
+            "name": "msvc-2022-release",
+            "configurePreset": "msvc-2022-release",
+            "displayName": "Release Build with MSVC 2022"
+        },
+        {
+            "name": "msvc-ninja",
+            "configurePreset": "msvc-ninja",
+            "displayName": "Build with MSVC + Ninja"
+        },
+        {
+            "name": "msvc-ninja-debug",
+            "configurePreset": "msvc-ninja-debug",
+            "displayName": "Debug Build with MSVC + Ninja"
+        },
+        {
+            "name": "msvc-ninja-release",
+            "configurePreset": "msvc-ninja-release",
+            "displayName": "Release Build with MSVC + Ninja"
+        },
+        {
+            "name": "clang-cl",
+            "configurePreset": "clang-cl",
+            "displayName": "Build with Clang-cl"
+        },
+        {
+            "name": "clang-cl-debug",
+            "configurePreset": "clang-cl-debug",
+            "displayName": "Debug Build with Clang-cl"
+        },
+        {
+            "name": "clang-cl-release",
+            "configurePreset": "clang-cl-release",
+            "displayName": "Release Build with Clang-cl"
+        },
+        {
             "name": "default",
             "configurePreset": "default",
             "displayName": "Default Build"
@@ -224,6 +416,26 @@
             "name": "clang-20-libcxx",
             "configurePreset": "clang-20-libcxx",
             "displayName": "Test with Clang 20 + libc++"
+        },
+        {
+            "name": "msvc-2022",
+            "configurePreset": "msvc-2022",
+            "displayName": "Test with MSVC 2022"
+        },
+        {
+            "name": "msvc-2022-debug",
+            "configurePreset": "msvc-2022-debug",
+            "displayName": "Debug Test with MSVC 2022"
+        },
+        {
+            "name": "msvc-ninja",
+            "configurePreset": "msvc-ninja",
+            "displayName": "Test with MSVC + Ninja"
+        },
+        {
+            "name": "clang-cl",
+            "configurePreset": "clang-cl",
+            "displayName": "Test with Clang-cl"
         },
         {
             "name": "default",
