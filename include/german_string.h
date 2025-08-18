@@ -199,6 +199,8 @@ namespace gs
         }
     }
 
+    // TODO: Add stream operators and getline
+
     template <typename TAllocator = std::allocator<char>>
     class basic_german_string
     {

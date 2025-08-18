@@ -57,17 +57,20 @@ enable_testing()
 add_test(NAME ${PROJECT_NAME}_tests COMMAND ${PROJECT_NAME}_tests)
 
 add_executable(1brc_base 1brc_base/main.cpp)
-add_executable(1brc_base_views 1brc_base_views/main.cpp)
+add_executable(1brc_base_max 1brc_base_max/main.cpp)
 add_executable(1brc_gs 1brc_gs/main.cpp)
 target_link_libraries(1brc_gs PRIVATE ${PROJECT_NAME}_lib)
+add_executable(1brc_gs_max 1brc_gs_max/main.cpp)
+target_link_libraries(1brc_gs_max PRIVATE ${PROJECT_NAME}_lib)
 
 # Set up folder organization for IDE
 set_target_properties(${PROJECT_NAME}_lib PROPERTIES FOLDER "Libraries")
 set_target_properties(${PROJECT_NAME}_benchmarks PROPERTIES FOLDER "Benchmarks")
 set_target_properties(${PROJECT_NAME}_tests PROPERTIES FOLDER "Tests")
 set_target_properties(1brc_base PROPERTIES FOLDER "1BRC")
-set_target_properties(1brc_base_views PROPERTIES FOLDER "1BRC")
+set_target_properties(1brc_base_max PROPERTIES FOLDER "1BRC")
 set_target_properties(1brc_gs PROPERTIES FOLDER "1BRC")
+set_target_properties(1brc_gs_max PROPERTIES FOLDER "1BRC")
 
 # Function to apply common compiler options to targets
 function(apply_compiler_options target_name)
@@ -137,8 +140,9 @@ apply_compiler_options(${PROJECT_NAME}_lib)
 apply_compiler_options(${PROJECT_NAME}_benchmarks)
 apply_compiler_options(${PROJECT_NAME}_tests)
 apply_compiler_options(1brc_base)
-apply_compiler_options(1brc_base_views)
+apply_compiler_options(1brc_base_max)
 apply_compiler_options(1brc_gs)
+apply_compiler_options(1brc_gs_max)
 
 # Special sanitizer options for tests (only for GCC/Clang, not Windows)  
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
@@ -152,12 +156,12 @@ if(WIN32)
     target_compile_definitions(${PROJECT_NAME}_benchmarks PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(${PROJECT_NAME}_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(1brc_base PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_compile_definitions(1brc_base_views PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(1brc_base_max PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(1brc_gs PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
 # Install targets (optional)
-install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks 1brc_base 1brc_base_views 1brc_gs
+install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks 1brc_base 1brc_base_max 1brc_gs 1brc_gs_max
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
