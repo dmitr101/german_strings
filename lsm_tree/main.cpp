@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <cstdint>
 #include <chrono>
+#include <ranges>
 
 // Linux memory mapping includes
 #include <fcntl.h>
@@ -491,9 +492,9 @@ public:
     std::optional<StringType> get(const StringType &key) const
     {
         load_cache();
-        // Use binary search since data is sorted
         auto it = std::lower_bound(data_cache_.begin(), data_cache_.end(), key,
-                                  [](const auto &pair, const StringType &k) {
+                                  [](const auto &pair, const StringType &k) 
+                                  {
                                       return pair.first < k;
                                   });
         if (it != data_cache_.end() && it->first == key)
@@ -583,23 +584,20 @@ public:
 
     std::optional<StringType> get(const StringType &key)
     {
-        // First check MemTable (most recent data)
         auto result = memtable_.get(key);
         if (result.has_value())
         {
             return result;
         }
 
-        // Then check SSTables in reverse order (newest first)
-        for (auto it = sstables_.rbegin(); it != sstables_.rend(); ++it)
+        for (auto& sstable : std::views::reverse(sstables_))
         {
-            result = (*it)->get(key);
+            result = sstable->get(key);
             if (result.has_value())
             {
                 return result;
             }
         }
-
         return std::nullopt;
     }
 
