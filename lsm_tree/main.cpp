@@ -200,20 +200,22 @@ public:
     template <typename StringType>
     static void write_key_value_data(const std::string &filename, const std::map<StringType, StringType> &data)
     {
-        // Calculate total size needed for binary format: |key_len|value_len|key|value|
-        size_t total_size = 0;
+        // Calculate total size needed for binary format: |record_count|key_len|value_len|key|value|...
+        size_t total_size = sizeof(uint32_t); // Header for record count
         for (const auto &[key, value] : data)
         {
             total_size += sizeof(uint32_t) + sizeof(uint32_t) + key.size() + value.size();
         }
 
-        if (total_size == 0)
+        if (data.empty())
         {
-            // Create empty file
+            // Create empty file with just the header
             int fd = open((filename + ".tmp").c_str(), O_CREAT | O_TRUNC | O_WRONLY,
                           S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
             if (fd >= 0)
             {
+                uint32_t record_count = 0;
+                write(fd, &record_count, sizeof(uint32_t));
                 close(fd);
             }
             std::filesystem::rename(filename + ".tmp", filename);
@@ -223,9 +225,14 @@ public:
         // Create memory-mapped file with the calculated size
         MappedFile mapped_file(filename, total_size, true);
 
-        // Write data in binary format: |key_len|value_len|key|value|
+        // Write data in binary format: |record_count|key_len|value_len|key|value|...
         auto writable_span = mapped_file.writable_data();
         char *ptr = writable_span.data();
+
+        // Write record count header (4 bytes, little endian)
+        uint32_t record_count = static_cast<uint32_t>(data.size());
+        std::memcpy(ptr, &record_count, sizeof(uint32_t));
+        ptr += sizeof(uint32_t);
 
         for (const auto &[key, value] : data)
         {
@@ -257,6 +264,18 @@ public:
     }
 };
 
+auto as_transient = []<typename T>(const T &str) -> T
+{
+    if constexpr (std::is_same_v<T, gs::german_string>)
+    {
+        return str.as_transient();
+    }
+    else
+    {
+        return str;
+    }
+};
+
 // MemTable: In-memory sorted storage
 template <typename StringType>
 class MemTable
@@ -267,37 +286,35 @@ private:
     size_t current_size_;
 
 public:
-    explicit MemTable(size_t threshold = 1024 * 1024) // 1MB default
+    explicit MemTable(size_t threshold = 8 * 1024 * 1024) // 4 MB default threshold
         : size_threshold_(threshold), current_size_(0)
     {
     }
 
+public:
     void put(StringType &&key, StringType &&value)
     {
-        auto old_size = data_.count(key) ? data_[key].size() : 0;
         auto emplace_result = data_.try_emplace(key, std::move(value));
         if (!emplace_result.second)
         {
+            current_size_ -= calculate_entry_size(key, emplace_result.first->second);
             // Key already exists, update the value
             emplace_result.first->second = std::move(value);
         }
-        current_size_ = current_size_ - old_size + key.size() + value.size();
+        current_size_ += calculate_entry_size(key, value);
     }
+
+private:
+    // Count entries instead of memory footprint to ensure equal flush behavior
+    size_t calculate_entry_size(const StringType &key, const StringType& val) const
+    {
+        return key.size() + val.size() + sizeof(StringType) * 2;
+    }
+
+public:
 
     std::optional<StringType> get(const StringType &key) const
     {
-        auto as_transient = []<typename T>(const T &str) -> T
-        {
-            if constexpr (std::is_same_v<T, gs::german_string>)
-            {
-                return str.as_transient();
-            }
-            else
-            {
-                return str;
-            }
-        };
-
         auto it = data_.find(key);
         if (it != data_.end())
         {
@@ -318,11 +335,11 @@ public:
 
     size_t size() const
     {
-        return data_.size();
+        return current_size_;
     }
 
     // Get all data for flushing to SSTable
-    std::map<StringType, StringType> get_all_data() const
+    const std::map<StringType, StringType>& get_all_data() const
     {
         return data_;
     }
@@ -340,7 +357,7 @@ class SSTable
 {
 private:
     std::string filename_;
-    mutable std::map<StringType, StringType> data_cache_; // Cache for parsed data
+    mutable std::vector<std::pair<StringType, StringType>> data_cache_; // Cache for parsed data (sorted by key)
     mutable bool cache_loaded_;
     mutable std::unique_ptr<MappedFile> mapped_file_; // Persistent mapping
     int level_;
@@ -381,7 +398,23 @@ private:
         const char *ptr = data_span.data();
         const char *end = ptr + data_span.size();
 
-        while (ptr + sizeof(uint32_t) * 2 <= end)
+        // Check if we have at least the header
+        if (ptr + sizeof(uint32_t) > end)
+        {
+            // File too small, corrupted
+            return;
+        }
+
+        // Read record count header (4 bytes, little endian)
+        uint32_t record_count;
+        std::memcpy(&record_count, ptr, sizeof(uint32_t));
+        ptr += sizeof(uint32_t);
+
+        // Reserve space in vector for better performance
+        data_cache_.reserve(record_count);
+
+        // Parse records
+        for (uint32_t i = 0; i < record_count && ptr + sizeof(uint32_t) * 2 <= end; ++i)
         {
             // Read key length (4 bytes, little endian)
             uint32_t key_len;
@@ -424,8 +457,18 @@ private:
             }
             ptr += value_len;
 
-            data_cache_[key] = value;
+            data_cache_.emplace_back(key, value);
         }
+        
+        // Data should already be sorted by construction, but let's verify this assumption
+        // In debug builds, we can add an assertion to check this
+        #ifndef NDEBUG
+        if (!std::is_sorted(data_cache_.begin(), data_cache_.end(),
+                           [](const auto &a, const auto &b) { return a.first < b.first; }))
+        {
+            throw std::runtime_error("SSTable data is not sorted - this violates the invariant");
+        }
+        #endif
     }
 
 public:
@@ -442,25 +485,25 @@ public:
         MappedFile::write_key_value_data(filename, data);
 
         auto sstable = std::make_unique<SSTable>(filename, level);
-        // Pre-populate cache since we have the data
-        sstable->data_cache_ = data;
-        sstable->cache_loaded_ = true;
-
         return sstable;
     }
 
     std::optional<StringType> get(const StringType &key) const
     {
         load_cache();
-        auto it = data_cache_.find(key);
-        if (it != data_cache_.end())
+        // Use binary search since data is sorted
+        auto it = std::lower_bound(data_cache_.begin(), data_cache_.end(), key,
+                                  [](const auto &pair, const StringType &k) {
+                                      return pair.first < k;
+                                  });
+        if (it != data_cache_.end() && it->first == key)
         {
             return it->second;
         }
         return std::nullopt;
     }
 
-    const std::map<StringType, StringType> &get_all_data() const
+    const std::vector<std::pair<StringType, StringType>> &get_all_data() const
     {
         load_cache();
         return data_cache_;
@@ -721,7 +764,7 @@ public:
     void print_stats() const
     {
         std::cout << "LSM Tree Stats:\n";
-        std::cout << "  MemTable size: " << memtable_.size() << " entries\n";
+        std::cout << "  MemTable size: " << memtable_.size() << " bytes\n";
         std::cout << "  SSTables count: " << sstables_.size() << "\n";
         for (size_t i = 0; i < sstables_.size(); ++i)
         {
@@ -891,21 +934,12 @@ void interactive_query(const std::string &lsm_dir = "./lsm_data")
         }
         else
         {
-            query_key = StringType(input.c_str(), input.size(), gs::string_class::persistent);
+            query_key = StringType(input.c_str(), input.size(), gs::string_class::transient);
         }
         auto result = lsm.get(query_key);
         if (result.has_value())
         {
-            if constexpr (std::is_same_v<StringType, std::string>)
-            {
-                std::cout << "Found: " << result.value() << "\n";
-            }
-            else
-            {
-                // For gs::german_string, convert to std::string for output
-                std::string output_str(result.value().data(), result.value().size());
-                std::cout << "Found: " << output_str << "\n";
-            }
+            std::cout << "Found: " << result.value() << "\n";
         }
         else
         {
@@ -914,6 +948,100 @@ void interactive_query(const std::string &lsm_dir = "./lsm_data")
     }
 
     std::cout << "Goodbye!\n";
+}
+
+// Bulk read keys from file
+template <typename StringType>
+void bulk_read_keys(const std::string &keys_filename, const std::string &lsm_dir = "./lsm_data")
+{
+    std::cout << "=== Bulk Key Reading ===\n";
+    std::cout << "Reading keys from: " << keys_filename << "\n";
+    std::cout << "LSM directory: " << lsm_dir << "\n\n";
+
+    // Open keys file
+    std::ifstream file(keys_filename);
+    if (!file.is_open())
+    {
+        throw std::runtime_error("Failed to open keys file: " + keys_filename);
+    }
+
+    // Create LSM tree
+    LSMTree<StringType> lsm(lsm_dir);
+
+    // Statistics
+    size_t line_count = 0;
+    size_t found_count = 0;
+    size_t not_found_count = 0;
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    std::string line;
+    while (std::getline(file, line))
+    {
+        line_count++;
+
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == '#')
+        {
+            continue;
+        }
+
+        // Trim whitespace
+        line.erase(0, line.find_first_not_of(" \t\r\n"));
+        line.erase(line.find_last_not_of(" \t\r\n") + 1);
+
+        if (line.empty())
+        {
+            continue;
+        }
+
+        try
+        {
+            StringType query_key;
+            if constexpr (std::is_same_v<StringType, std::string>)
+            {
+                query_key = line;
+            }
+            else
+            {
+                query_key = StringType(line.c_str(), line.size(), gs::string_class::transient);
+            }
+
+            auto result = lsm.get(query_key);
+            if (result.has_value())
+            {
+                std::cout << "Found: " << line << " -> " << result.value() << "\n";
+                found_count++;
+            }
+            else
+            {
+                std::cout << "Not found: " << line << "\n";
+                not_found_count++;
+            }
+
+            // Progress report every 1000 queries
+            if ((found_count + not_found_count) % 1000 == 0)
+            {
+                std::cout << "Processed " << (found_count + not_found_count) << " queries...\n";
+            }
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Warning: Failed to process line " << line_count
+                      << " (" << line << "): " << e.what() << "\n";
+        }
+    }
+
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+    std::cout << "\n=== Bulk Read Complete ===\n";
+    std::cout << "Total lines read: " << line_count << "\n";
+    std::cout << "Keys found: " << found_count << "\n";
+    std::cout << "Keys not found: " << not_found_count << "\n";
+    std::cout << "Total queries: " << (found_count + not_found_count) << "\n";
+    std::cout << "Time taken: " << duration.count() << " ms\n";
+    auto duration_count = duration.count();
+    std::cout << "Queries per second: " << (duration_count > 0 ? (found_count + not_found_count) * 1000 / duration_count : 0) << "\n\n";
 }
 
 // Demo function
@@ -1041,7 +1169,8 @@ void print_usage(const char *program_name)
     std::cout << "  ingest <csv_file>       Bulk ingest data from CSV file\n";
     std::cout << "  query                   Interactive query mode\n";
     std::cout << "  get <key>               Get value for a specific key\n";
-    std::cout << "  delete <key>            Delete a key (tombstone)\n\n";
+    std::cout << "  delete <key>            Delete a key (tombstone)\n";
+    std::cout << "  bulk_read <keys_file>   Bulk read keys from a file\n\n";
     std::cout << "Options:\n";
     std::cout << "  --dir <directory>       LSM data directory (default: ./lsm_data)\n\n";
     std::cout << "CSV Format:\n";
@@ -1054,6 +1183,7 @@ void print_usage(const char *program_name)
     std::cout << "  " << program_name << " ingest data.csv --dir /path/to/lsm\n";
     std::cout << "  " << program_name << " query --dir /path/to/lsm\n";
     std::cout << "  " << program_name << " get mykey\n";
+    std::cout << "  " << program_name << " bulk_read keys.txt\n";
 }
 
 template <typename StringType>
@@ -1129,6 +1259,17 @@ int template_main(int argc, char *argv[])
             lsm.flush_memtable(); // Ensure the tombstone is persisted
             std::cout << "Key deleted: " << key << "\n";
             return 0;
+        }
+        else if (command == "bulk_read")
+        {
+            if (argc < 4)
+            {
+                std::cerr << "Error: Keys file not specified\n";
+                print_usage(argv[0]);
+                return 1;
+            }
+            std::string keys_file = argv[3];
+            bulk_read_keys<StringType>(keys_file, lsm_dir);
         }
         else
         {

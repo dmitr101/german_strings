@@ -350,8 +350,7 @@ namespace gs
             if (this != &other)
             {
                 _impl = std::move(other._impl);
-                other._impl._state[0] = 0;
-                other._impl._state[1] = 0;
+                other._impl._state[1] = other._impl._state[1] | other._impl._get_ptr_tag(string_class::transient);
             }
             return *this;
         }
