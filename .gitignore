@@ -60,3 +60,5 @@ lib/
 # OS specific files
 .DS_Store
 Thumbs.db
+
+lsm_data/

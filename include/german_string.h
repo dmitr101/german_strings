@@ -13,6 +13,7 @@
 #include <limits>
 #include <bit>
 #include <iterator>
+#include <ostream>
 
 // TODO: I'm passing a lot by const reference, but I should be passing by value maybe???
 // TODO: A constructor withj size type being size_t and check if the size fits in 32 bits and panic if it doesn't
@@ -225,7 +226,7 @@ namespace gs
                 _state[0] = size;
                 if (_is_small())
                 {
-                    std::memcpy(_get_maybe_small_ptr(), str, size);
+                    std::memcpy(_get_small_ptr(), str, size);
                 }
                 else
                 {
@@ -348,7 +349,6 @@ namespace gs
         {
             if (this != &other)
             {
-                _impl.~_gs_impl();
                 _impl = std::move(other._impl);
                 other._impl._state[0] = 0;
                 other._impl._state[1] = 0;
@@ -388,6 +388,24 @@ namespace gs
                 return *this;
             }
             return basic_german_string(_impl._get_non_small_ptr(), _impl._get_size(), string_class::temporary, get_allocator());
+        }
+
+        basic_german_string move_to_temporary() const
+        {
+            if (_impl._is_small() || _impl._get_class() == string_class::temporary)
+            {
+                return *this;
+            }
+            return basic_german_string(_impl._get_non_small_ptr(), _impl._get_size(), string_class::temporary, get_allocator());
+        }
+
+        basic_german_string as_transient() const
+        {
+            if (_impl._is_small())
+            {
+                return *this;
+            }
+            return basic_german_string(_impl._get_non_small_ptr(), _impl._get_size(), string_class::transient, get_allocator());
         }
 
         int compare(const basic_german_string &other) const
@@ -462,6 +480,15 @@ namespace gs
         float result = 0.0f;
         auto fc_result = std::from_chars(str.data(), str.data() + str.size(), result);
         return result;
+    }
+
+    template <class Allocator>
+    std::basic_ostream<char, std::char_traits<char>> &
+    operator<<(std::basic_ostream<char, std::char_traits<char>> &os,
+               const basic_german_string<Allocator> &str)
+    {
+        os << str.as_string_view();
+        return os;
     }
 }
 

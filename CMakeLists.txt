@@ -62,6 +62,8 @@ add_executable(1brc_gs 1brc_gs/main.cpp)
 target_link_libraries(1brc_gs PRIVATE ${PROJECT_NAME}_lib)
 add_executable(1brc_gs_max 1brc_gs_max/main.cpp)
 target_link_libraries(1brc_gs_max PRIVATE ${PROJECT_NAME}_lib)
+add_executable(lsm_tree lsm_tree/main.cpp)
+target_link_libraries(lsm_tree PRIVATE ${PROJECT_NAME}_lib)
 
 # Set up folder organization for IDE
 set_target_properties(${PROJECT_NAME}_lib PROPERTIES FOLDER "Libraries")
@@ -71,15 +73,14 @@ set_target_properties(1brc_base PROPERTIES FOLDER "1BRC")
 set_target_properties(1brc_base_max PROPERTIES FOLDER "1BRC")
 set_target_properties(1brc_gs PROPERTIES FOLDER "1BRC")
 set_target_properties(1brc_gs_max PROPERTIES FOLDER "1BRC")
+set_target_properties(lsm_tree PROPERTIES FOLDER "Examples")
 
 # Function to apply common compiler options to targets
 function(apply_compiler_options target_name)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(${target_name} PRIVATE 
             -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wnon-virtual-dtor -Wcast-align
-            -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion
-            -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches
-            -Wlogical-op -Wnull-dereference -Wuseless-cast -Wdouble-promotion
+            -Wunused -Woverloaded-virtual -Wpedantic -Wconversion -Wsign-conversion -Wduplicated-branches -Wnull-dereference -Wuseless-cast -Wdouble-promotion
             -Wformat=2
         )
         
@@ -143,6 +144,7 @@ apply_compiler_options(1brc_base)
 apply_compiler_options(1brc_base_max)
 apply_compiler_options(1brc_gs)
 apply_compiler_options(1brc_gs_max)
+apply_compiler_options(lsm_tree)
 
 # Special sanitizer options for tests (only for GCC/Clang, not Windows)  
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
@@ -158,10 +160,12 @@ if(WIN32)
     target_compile_definitions(1brc_base PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(1brc_base_max PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(1brc_gs PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(1brc_gs_max PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(lsm_tree PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
 # Install targets (optional)
-install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks 1brc_base 1brc_base_max 1brc_gs 1brc_gs_max
+install(TARGETS ${PROJECT_NAME}_lib ${PROJECT_NAME}_benchmarks 1brc_base 1brc_base_max 1brc_gs 1brc_gs_max lsm_tree
         RUNTIME DESTINATION bin
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib)
