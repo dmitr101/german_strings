@@ -157,19 +157,19 @@ void StringStartsWithComparison(benchmark::State &state)
     state.SetItemsProcessed(state.iterations() * count);
 }
 
-BENCHMARK_TEMPLATE(StringStartsWithComparison, std::string)
-    ->Args({1000, 8, 1024, 42})
-    ->Args({10000, 8, 1024, 42})
-    ->Args({100000, 8, 1024, 42})
-    ->Args({500000, 8, 1024, 42})
-    ->Args({1000000, 8, 1024, 42});
-
-BENCHMARK_TEMPLATE(StringStartsWithComparison, gs::german_string)
-    ->Args({1000, 8, 1024, 42})
-    ->Args({10000, 8, 1024, 42})
-    ->Args({100000, 8, 1024, 42})
-    ->Args({500000, 8, 1024, 42})
-    ->Args({1000000, 8, 1024, 42});
+//BENCHMARK_TEMPLATE(StringStartsWithComparison, std::string)
+//    ->Args({1000, 8, 1024, 42})
+//    ->Args({10000, 8, 1024, 42})
+//    ->Args({100000, 8, 1024, 42})
+//    ->Args({500000, 8, 1024, 42})
+//    ->Args({1000000, 8, 1024, 42});
+//
+//BENCHMARK_TEMPLATE(StringStartsWithComparison, gs::german_string)
+//    ->Args({1000, 8, 1024, 42})
+//    ->Args({10000, 8, 1024, 42})
+//    ->Args({100000, 8, 1024, 42})
+//    ->Args({500000, 8, 1024, 42})
+//    ->Args({1000000, 8, 1024, 42});
 
 template <typename StringType>
 void StringEqualityComparison(benchmark::State &state)
@@ -239,19 +239,19 @@ void StringLexicographicComparison(benchmark::State &state)
     state.SetItemsProcessed(state.iterations() * (strings.size() / 2));
 }
 
-BENCHMARK_TEMPLATE(StringLexicographicComparison, std::string)
-    ->Args({1000, 8, 128, 42})
-    ->Args({10000, 8, 128, 42})
-    ->Args({100000, 8, 128, 42})
-    ->Args({500000, 8, 128, 42})
-    ->Args({1000000, 8, 128, 42});
-
-BENCHMARK_TEMPLATE(StringLexicographicComparison, gs::german_string)
-    ->Args({1000, 8, 128, 42})
-    ->Args({10000, 8, 128, 42})
-    ->Args({100000, 8, 128, 42})
-    ->Args({500000, 8, 128, 42})
-    ->Args({1000000, 8, 128, 42});
+//BENCHMARK_TEMPLATE(StringLexicographicComparison, std::string)
+//    ->Args({1000, 8, 128, 42})
+//    ->Args({10000, 8, 128, 42})
+//    ->Args({100000, 8, 128, 42})
+//    ->Args({500000, 8, 128, 42})
+//    ->Args({1000000, 8, 128, 42});
+//
+//BENCHMARK_TEMPLATE(StringLexicographicComparison, gs::german_string)
+//    ->Args({1000, 8, 128, 42})
+//    ->Args({10000, 8, 128, 42})
+//    ->Args({100000, 8, 128, 42})
+//    ->Args({500000, 8, 128, 42})
+//    ->Args({1000000, 8, 128, 42});
 
 template <typename StringType>
 void StringSorting(benchmark::State &state)
@@ -317,30 +317,71 @@ void StringComparisonByLength(benchmark::State &state)
     state.SetLabel("length=" + std::to_string(length));
 }
 
-BENCHMARK_TEMPLATE(StringComparisonByLength, std::string)
-    ->Arg(4)
-    ->Arg(8)
-    ->Arg(12)
-    ->Arg(16)
-    ->Arg(32)
-    ->Arg(64)
-    ->Arg(128)
-    ->Arg(256)
-    ->Arg(512)
-    ->Arg(1024)
-    ->Arg(2048);
+//BENCHMARK_TEMPLATE(StringComparisonByLength, std::string)
+//    ->Arg(4)
+//    ->Arg(8)
+//    ->Arg(12)
+//    ->Arg(16)
+//    ->Arg(32)
+//    ->Arg(64)
+//    ->Arg(128)
+//    ->Arg(256)
+//    ->Arg(512)
+//    ->Arg(1024)
+//    ->Arg(2048);
+//
+//BENCHMARK_TEMPLATE(StringComparisonByLength, gs::german_string)
+//    ->Arg(4)
+//    ->Arg(8)
+//    ->Arg(12)
+//    ->Arg(16)
+//    ->Arg(32)
+//    ->Arg(64)
+//    ->Arg(128)
+//    ->Arg(256)
+//    ->Arg(512)
+//    ->Arg(1024)
+//    ->Arg(2048);
 
-BENCHMARK_TEMPLATE(StringComparisonByLength, gs::german_string)
-    ->Arg(4)
-    ->Arg(8)
-    ->Arg(12)
-    ->Arg(16)
-    ->Arg(32)
-    ->Arg(64)
-    ->Arg(128)
-    ->Arg(256)
-    ->Arg(512)
-    ->Arg(1024)
-    ->Arg(2048);
+template <typename StringType>
+void StringHashingByLength(benchmark::State& state)
+{
+    uint32_t length = static_cast<uint32_t>(state.range(0));
+    uint32_t seed = static_cast<uint32_t>(state.range(1));
+
+    auto strings = generate_random_strings<StringType>(2000, length, length, seed);
+
+    for (auto _ : state)
+    {
+        uint64_t ResultingHash = 0;
+        for (size_t i = 0; i < strings.size(); i += 2)
+        {
+			ResultingHash = ResultingHash ^ std::hash<StringType>{}(strings[i]);
+        }
+        benchmark::DoNotOptimize(ResultingHash);
+        benchmark::ClobberMemory();
+    }
+
+    state.SetItemsProcessed(state.iterations() * (strings.size() / 2));
+    state.SetLabel("length=" + std::to_string(length));
+}
+
+BENCHMARK_TEMPLATE(StringHashingByLength, std::string)
+->Arg(12)
+->Arg(16)
+->Arg(64)
+->Arg(256)
+->Arg(512)
+->Arg(1024)
+->Arg(2048);
+
+BENCHMARK_TEMPLATE(StringHashingByLength, gs::german_string)
+->Arg(12)
+->Arg(16)
+->Arg(64)
+->Arg(256)
+->Arg(512)
+->Arg(1024)
+->Arg(2048);
 
 BENCHMARK_MAIN();
